@@ -1,5 +1,5 @@
 <p align="center">
-  <h1 align="center">AutoSales AI</h1>
+  <h1 align="center">OpenCRM</h1>
   <p align="center">
     <strong>Autonomous AI Sales Agent with CRM Dashboard</strong>
   </p>
@@ -14,7 +14,7 @@
 
 ---
 
-AutoSales AI is a fully autonomous AI sales development agent that handles the entire outbound sales process -- researching prospects, crafting personalized emails, following up on schedule, and qualifying leads -- while giving you complete visibility and control through a Pipedrive-inspired CRM dashboard. Deploy it on your own infrastructure, connect your email, and let it work around the clock.
+OpenCRM is a fully autonomous AI sales development agent that handles the entire outbound sales process -- researching prospects, crafting personalized emails, following up on schedule, and qualifying leads -- while giving you complete visibility and control through a Pipedrive-inspired CRM dashboard. Deploy it on your own infrastructure, connect your email, and let it work around the clock.
 
 ## Key Features
 
@@ -65,8 +65,8 @@ Get up and running in under 5 minutes:
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/adikam/autosales-ai.git
-cd autosales-ai
+git clone https://github.com/adikam/open-crm-agent.git
+cd open-crm-agent
 
 # 2. Copy and configure environment variables
 cp .env.example .env
@@ -114,7 +114,7 @@ For the full architectural deep-dive, see [ARCHITECTURE.md](docs/ARCHITECTURE.md
 |-------|-----------|
 | Frontend | Next.js 14, React 18, TypeScript, Tailwind CSS, shadcn/ui |
 | Backend API | Python 3.12, FastAPI, Pydantic v2 |
-| AI/LLM | OpenAI GPT-4o / Claude 3.5, LangChain |
+| AI/LLM | OpenAI GPT-4o, LangChain |
 | Database | PostgreSQL 16, pgvector, Drizzle ORM (frontend), SQLAlchemy (backend) |
 | Email | Microsoft Graph API, Gmail OAuth2, IMAP/SMTP |
 | Infra | Docker, Docker Compose, Nginx, Let's Encrypt |
@@ -123,7 +123,7 @@ For the full architectural deep-dive, see [ARCHITECTURE.md](docs/ARCHITECTURE.md
 
 ## Agent System
 
-AutoSales AI uses a multi-agent architecture where each agent specializes in one phase of the sales cycle:
+OpenCRM uses a multi-agent architecture where each agent specializes in one phase of the sales cycle:
 
 | Agent | Status | Description |
 |-------|--------|-------------|
@@ -201,5 +201,5 @@ Inspired by:
 ---
 
 <p align="center">
-  <strong>If AutoSales AI helps your sales process, give it a star on GitHub.</strong>
+  <strong>If OpenCRM helps your sales process, give it a star on GitHub.</strong>
 </p>
