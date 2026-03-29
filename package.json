@@ -1,0 +1,28 @@
+{
+  "name": "autosales-ai",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AutoSales AI - Autonomous B2B Sales Development Agent for ADIKAM",
+  "author": "ADIKAM Sp. z o.o.",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@9.15.0",
+  "scripts": {
+    "dev": "pnpm --filter web dev",
+    "build": "pnpm --filter web build",
+    "start": "pnpm --filter web start",
+    "lint": "pnpm --filter web lint",
+    "db:migrate": "pnpm --filter web prisma migrate deploy",
+    "db:generate": "pnpm --filter web prisma generate",
+    "db:studio": "pnpm --filter web prisma studio",
+    "agent:dev": "cd packages/agent && uvicorn autosales.main:app --reload --port 8000",
+    "agent:start": "cd packages/agent && uvicorn autosales.main:app --host 0.0.0.0 --port 8000 --workers 2",
+    "docker:up": "docker compose -f docker/docker-compose.yml up -d",
+    "docker:down": "docker compose -f docker/docker-compose.yml down",
+    "docker:dev": "docker compose -f docker/docker-compose.yml -f docker/docker-compose.dev.yml up",
+    "docker:logs": "docker compose -f docker/docker-compose.yml logs -f"
+  }
+}

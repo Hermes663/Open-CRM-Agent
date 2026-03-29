@@ -1,0 +1,33 @@
+[Unit]
+Description=AutoSales AI - Agent Daemon (FastAPI)
+Documentation=https://github.com/adikam/autosales-ai
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=autosales
+Group=autosales
+WorkingDirectory=/opt/autosales-ai/packages/agent
+EnvironmentFile=/opt/autosales-ai/.env
+ExecStart=/opt/autosales-ai/packages/agent/.venv/bin/uvicorn autosales.main:app --host 0.0.0.0 --port 8000 --workers 2
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=autosales-agent
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/autosales-ai/packages/agent
+ReadOnlyPaths=/opt/autosales-ai/agent-config
+PrivateTmp=true
+
+# Resource limits
+LimitNOFILE=65536
+MemoryMax=1G
+
+[Install]
+WantedBy=multi-user.target

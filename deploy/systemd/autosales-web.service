@@ -1,0 +1,34 @@
+[Unit]
+Description=AutoSales AI - Web Dashboard (Next.js)
+Documentation=https://github.com/adikam/autosales-ai
+After=network.target autosales-agent.service
+Wants=autosales-agent.service
+
+[Service]
+Type=simple
+User=autosales
+Group=autosales
+WorkingDirectory=/opt/autosales-ai/packages/web
+Environment=NODE_ENV=production
+Environment=PORT=3000
+EnvironmentFile=/opt/autosales-ai/.env
+ExecStart=/usr/bin/node server.js
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=autosales-web
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/autosales-ai/packages/web/.next
+PrivateTmp=true
+
+# Resource limits
+LimitNOFILE=65536
+MemoryMax=512M
+
+[Install]
+WantedBy=multi-user.target
