@@ -4,13 +4,11 @@ from __future__ import annotations
 
 import logging
 import re
-from pathlib import Path
 from typing import Any
 
-logger = logging.getLogger("autosales.utils.templates")
+from autosales.utils.paths import agent_config_dir
 
-# Directory for user-supplied templates (relative to project root).
-_TEMPLATE_DIR = Path("agent-config/templates")
+logger = logging.getLogger("autosales.utils.templates")
 
 # ---------------------------------------------------------------------------
 # Built-in templates
@@ -64,8 +62,8 @@ class EmailTemplateEngine:
     ``{{variable}}`` syntax.
     """
 
-    def __init__(self, template_dir: Path | None = None) -> None:
-        self._template_dir = template_dir or _TEMPLATE_DIR
+    def __init__(self, template_dir=None) -> None:
+        self._template_dir = template_dir or (agent_config_dir() / "templates")
 
     def load_template(self, name: str) -> str:
         """Load a template by name.

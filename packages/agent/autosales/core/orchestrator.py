@@ -8,8 +8,8 @@ calls happen here -- this is deterministic logic.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 logger = logging.getLogger("autosales.orchestrator")
 
@@ -28,7 +28,7 @@ def route_deal(
     deal: dict[str, Any],
     activities: list[dict[str, Any]],
     pending_followups: list[dict[str, Any]],
-) -> Optional[str]:
+) -> str | None:
     """Determine the next agent to run for a deal.
 
     Args:
@@ -75,13 +75,12 @@ def route_deal(
             return None  # caller should move to lost
         return "followup"
 
-    # -- negotiation (stub) ---------------------------------------------
+    # -- negotiation / closing ------------------------------------------
     if stage == "negotiation":
-        return "pricer"
+        return None
 
-    # -- closing (stub) -------------------------------------------------
     if stage == "closing":
-        return "closer"
+        return None
 
     # -- won / lost / unknown -------------------------------------------
     logger.debug("[orchestrator] No action for stage '%s'", stage)
@@ -95,7 +94,10 @@ def route_deal(
 def has_research(activities: list[dict[str, Any]]) -> bool:
     """Return True if any activity is a completed research entry."""
     return any(
-        a.get("activity_type") == "research" and a.get("status") == "completed"
+        (
+            a.get("activity_type") in {"research", "research_completed"}
+            and a.get("status", "completed") == "completed"
+        )
         for a in activities
     )
 
@@ -105,12 +107,16 @@ def has_customer_reply(activities: list[dict[str, Any]]) -> bool:
     for a in activities:
         direction = a.get("direction", "").lower()
         activity_type = a.get("activity_type", "").lower()
-        if direction == "inbound" or activity_type in ("reply", "inbound_email"):
+        if direction == "inbound" or activity_type in (
+            "reply",
+            "inbound_email",
+            "email_received",
+        ):
             return True
     return False
 
 
-def days_since_last_activity(activities: list[dict[str, Any]]) -> Optional[float]:
+def days_since_last_activity(activities: list[dict[str, Any]]) -> float | None:
     """Return the number of days since the most recent activity, or None."""
     if not activities:
         return None
@@ -128,9 +134,9 @@ def days_since_last_activity(activities: list[dict[str, Any]]) -> Optional[float
             latest = latest_str  # already a datetime
 
         if latest.tzinfo is None:
-            latest = latest.replace(tzinfo=timezone.utc)
+            latest = latest.replace(tzinfo=UTC)
 
-        delta = datetime.now(timezone.utc) - latest
+        delta = datetime.now(UTC) - latest
         return delta.total_seconds() / 86400.0
     except (ValueError, TypeError):
         logger.warning("[orchestrator] Could not parse activity timestamp: %s", latest_str)

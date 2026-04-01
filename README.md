@@ -1,205 +1,110 @@
 <p align="center">
   <h1 align="center">OpenCRM</h1>
   <p align="center">
-    <strong>Autonomous AI Sales Agent with CRM Dashboard</strong>
-  </p>
-  <p align="center">
-    <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License"></a>
-    <a href="#"><img src="https://img.shields.io/badge/python-3.12+-green.svg" alt="Python 3.12+"></a>
-    <a href="#"><img src="https://img.shields.io/badge/Next.js-14-black.svg" alt="Next.js 14"></a>
-    <a href="#"><img src="https://img.shields.io/badge/docker-compose-2496ED.svg" alt="Docker"></a>
-    <a href="#"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs Welcome"></a>
+    <strong>Production-oriented CRM and autonomous sales agent runtime</strong>
   </p>
 </p>
 
 ---
 
-OpenCRM is a fully autonomous AI sales development agent that handles the entire outbound sales process -- researching prospects, crafting personalized emails, following up on schedule, and qualifying leads -- while giving you complete visibility and control through a Pipedrive-inspired CRM dashboard. Deploy it on your own infrastructure, connect your email, and let it work around the clock.
+This repository ships a working v1 stack built around:
 
-## Key Features
+- `Next.js 14` for the CRM dashboard
+- `FastAPI` for the agent runtime
+- `PostgreSQL` plus SQL migrations as the runtime source of truth
+- three active agents: `research`, `qualifier`, `followup`
 
-- **Autonomous Operation** -- Heartbeat daemon runs continuously, picking up new leads and following up on existing conversations without human intervention
-- **Infinite Memory** -- Three-tier memory system (working, episodic, semantic) with pgvector-powered search so the AI never forgets a conversation or loses context
-- **CRM Dashboard** -- Pipedrive-style kanban board with drag-and-drop deal stages, contact profiles, activity timeline, and email thread viewer
-- **Multi-Provider Email** -- Native support for Microsoft Outlook (Graph API), Gmail (OAuth2), and any IMAP/SMTP server
-- **AI-Powered Agents** -- Specialized agents for research, qualification, follow-up, negotiation, and closing, each with distinct prompts and strategies
-- **Self-Hosted** -- Full Docker Compose stack: no SaaS dependencies, no per-seat pricing, your data stays on your servers
-- **One-Command VPS Deploy** -- Automated setup script for Ubuntu servers with SSL, systemd services, and monitoring out of the box
-- **Open Source** -- MIT licensed. Fork it, extend it, build your sales empire on it
+`negotiation` and `closing` remain visible as CRM stages, but automated routing to specialist agents is intentionally disabled in v1.
 
-## Architecture Overview
+## What Works in v1
 
-```
-                          +------------------+
-                          |   CRM Dashboard  |
-                          |   (Next.js 14)   |
-                          +--------+---------+
-                                   |
-                              REST API
-                                   |
-+----------------+      +----------+----------+      +----------------+
-|                |      |                     |      |                |
-|  Email Inbox   +----->+    Agent Engine     +----->+  Email Outbox  |
-|  (Outlook/     |      |    (FastAPI)        |      |  (SMTP/Graph)  |
-|   Gmail/IMAP)  |      |                     |      |                |
-+----------------+      +----+-------+--------+      +----------------+
-                              |       |
-                    +---------+       +---------+
-                    |                           |
-             +------+------+           +--------+--------+
-             |  PostgreSQL  |           |   AI Agents     |
-             |  + pgvector  |           |                 |
-             |             |           |  - Research      |
-             |  - Contacts  |           |  - Qualifier    |
-             |  - Deals     |           |  - Follow-up    |
-             |  - Emails    |           |  - Negotiator   |
-             |  - Memory    |           |  - Closer       |
-             +-------------+           +-----------------+
-```
+- dashboard, pipeline, contact list, deal detail, activity timeline
+- internal Next.js API routes used by the UI instead of direct browser-side Supabase reads
+- FastAPI heartbeat at `/agent/heartbeat`
+- manual agent runs at `/agent/run/{agent_name}`
+- database migrations and seed scripts driven from `supabase/migrations` and `supabase/seed.sql`
+- email provider selection for `imap`, `gmail`, or `outlook`
 
-**How it works:** The heartbeat daemon polls for new inbound emails and scheduled follow-ups. The orchestrator routes each task to the appropriate AI agent. Agents use the memory system for context, generate responses via LLM, and send emails through your configured provider. Every action is logged and visible in the CRM dashboard.
+## Repository Layout
 
-## Quick Start
+| Path | Purpose |
+|------|---------|
+| `packages/web` | Next.js CRM UI |
+| `packages/agent` | FastAPI runtime, orchestrator, agent logic |
+| `supabase/migrations` | Canonical SQL schema and runtime alignment migrations |
+| `docker` | Dockerfiles and compose files |
+| `scripts` | Helper scripts for DB migration, seed, and Python env bootstrap |
 
-Get up and running in under 5 minutes:
+## Local Quick Start
 
 ```bash
-# 1. Clone the repository
-git clone https://github.com/adikam/open-crm-agent.git
-cd open-crm-agent
+git clone https://github.com/Hermes663/Open-CRM-Agent.git
+cd Open-CRM-Agent
 
-# 2. Copy and configure environment variables
 cp .env.example .env
-# Edit .env with your API keys and email credentials
+pnpm install
 
-# 3. Start everything with Docker Compose
-docker compose up -d
+docker compose -f docker/docker-compose.yml up -d db
+pnpm db:migrate
+pnpm db:seed
 
-# 4. Open the CRM dashboard
-open http://localhost:3000
-
-# 5. (Optional) Configure agents via the dashboard
-# Navigate to Settings > Agents to customize behavior
+pnpm agent:dev
+pnpm dev
 ```
 
-For detailed setup instructions, see the [Quick Start Guide](docs/QUICKSTART.md).
+After startup:
 
-## Screenshots
+- dashboard: [http://localhost:3000](http://localhost:3000)
+- agent API: [http://localhost:8000](http://localhost:8000)
+- FastAPI docs: [http://localhost:8000/docs](http://localhost:8000/docs)
 
-> Screenshots coming soon. Here is what you will see:
+## Required Environment Variables
 
-| Screen | Description |
-|--------|-------------|
-| **Kanban Board** | Drag-and-drop deal pipeline with stages: New Lead, Contacted, Qualified, Proposal, Negotiation, Closed Won/Lost |
-| **Contact Profile** | Full contact details, company info, activity timeline, and email thread history |
-| **Email Composer** | AI-suggested email drafts with tone controls, personalization tokens, and send scheduling |
-| **Agent Dashboard** | Real-time view of agent activity, decisions made, emails sent, and performance metrics |
-| **Settings** | Email provider configuration, agent tuning, pipeline customization, and team management |
+Minimum runtime configuration:
 
-## Architecture
+```env
+DATABASE_URL=postgresql://autosales:your_secure_password@localhost:5432/autosales
+JWT_SECRET=replace_me
+AGENT_API_URL=http://localhost:8000
+LLM_PROVIDER=anthropic
+ANTHROPIC_API_KEY=...
+EMAIL_PROVIDER=imap
+IMAP_HOST=...
+IMAP_USER=...
+IMAP_PASSWORD=...
+SMTP_HOST=...
+SMTP_USER=...
+SMTP_PASSWORD=...
+```
 
-The system is composed of three main services:
+Supabase-related variables remain optional and are not required for the v1 runtime path.
 
-| Service | Tech | Purpose |
-|---------|------|---------|
-| **CRM Frontend** | Next.js 14, React, Tailwind CSS, shadcn/ui | Dashboard, email viewer, pipeline management |
-| **Agent Engine** | Python 3.12, FastAPI, LangChain | AI agents, heartbeat daemon, orchestrator |
-| **Database** | PostgreSQL 16 + pgvector | Contacts, deals, emails, memory vectors |
+## Verification
 
-For the full architectural deep-dive, see [ARCHITECTURE.md](docs/ARCHITECTURE.md).
+```bash
+pnpm lint
+pnpm build
+pnpm agent:lint
+pnpm agent:test
+```
 
-## Tech Stack
+## Docker
 
-| Layer | Technology |
-|-------|-----------|
-| Frontend | Next.js 14, React 18, TypeScript, Tailwind CSS, shadcn/ui |
-| Backend API | Python 3.12, FastAPI, Pydantic v2 |
-| AI/LLM | OpenAI GPT-4o, LangChain |
-| Database | PostgreSQL 16, pgvector, Drizzle ORM (frontend), SQLAlchemy (backend) |
-| Email | Microsoft Graph API, Gmail OAuth2, IMAP/SMTP |
-| Infra | Docker, Docker Compose, Nginx, Let's Encrypt |
-| CI/CD | GitHub Actions |
-| Monitoring | Structured logging, health endpoints |
+Production-style stack:
 
-## Agent System
+```bash
+docker compose -f docker/docker-compose.yml up -d db
+bash scripts/db_migrate.sh
+docker compose -f docker/docker-compose.yml up -d web agent
+```
 
-OpenCRM uses a multi-agent architecture where each agent specializes in one phase of the sales cycle:
+Development override:
 
-| Agent | Status | Description |
-|-------|--------|-------------|
-| **Research Agent** | Implemented | Enriches prospect data from LinkedIn, company websites, and public sources |
-| **Qualifier Agent** | Implemented | Scores leads based on ICP fit, engagement signals, and conversation analysis |
-| **Follow-up Agent** | Implemented | Manages follow-up cadences with contextual, personalized messages |
-| **Negotiator Agent** | Planned | Handles objections, proposes solutions, navigates pricing discussions |
-| **Closer Agent** | Planned | Drives conversations toward commitment, handles final logistics |
+```bash
+docker compose -f docker/docker-compose.yml -f docker/docker-compose.dev.yml up
+```
 
-The **Orchestrator** sits above all agents and decides which agent handles each interaction based on deal stage, conversation context, and configurable rules.
+## Documentation
 
-## Roadmap
-
-### Phase 1 -- Core (Current)
-- [x] CRM dashboard with kanban pipeline
-- [x] Email integration (Outlook, Gmail, IMAP)
-- [x] Research, Qualifier, and Follow-up agents
-- [x] Heartbeat daemon for autonomous operation
-- [x] Three-tier memory system with semantic search
-- [x] Docker Compose deployment
-
-### Phase 2 -- Growth
-- [ ] Multi-user support with role-based access
-- [ ] Team analytics and performance dashboards
-- [ ] Webhook integrations (Slack, Zapier)
-- [ ] Calendar booking integration
-- [ ] A/B testing for email templates
-
-### Phase 3 -- Scale
-- [ ] Negotiator and Closer agents
-- [ ] Voice call integration
-- [ ] Multi-language support
-- [ ] Custom agent builder (no-code)
-- [ ] Marketplace for agent templates
-
-## Contributing
-
-Contributions are welcome and appreciated. Here is how to get started:
-
-1. **Fork** the repository
-2. **Create** a feature branch: `git checkout -b feature/my-feature`
-3. **Commit** your changes: `git commit -m "Add my feature"`
-4. **Push** to your branch: `git push origin feature/my-feature`
-5. **Open** a Pull Request
-
-Please make sure your code passes linting (`ruff check` for Python, `next lint` for the frontend) before submitting.
-
-### Areas Where Help Is Needed
-
-- Agent prompt engineering and evaluation
-- Email deliverability optimization
-- Dashboard UI/UX improvements
-- Additional email provider integrations
-- Documentation and tutorials
-- Test coverage
-
-## Deployment
-
-- **Local development**: `docker compose up` (see [Quick Start](docs/QUICKSTART.md))
-- **VPS production**: One-command install script (see [Deployment Guide](docs/DEPLOYMENT.md))
-
-## License
-
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
-
-## Credits
-
-Built by [ADIKAM](https://adikam.com).
-
-Inspired by:
-- **OpenClaw** -- for the open-source AI agent architecture patterns
-- **Agent Hermes** -- for autonomous agent orchestration concepts
-- **Pipedrive** -- for the CRM dashboard design philosophy
-
----
-
-<p align="center">
-  <strong>If OpenCRM helps your sales process, give it a star on GitHub.</strong>
-</p>
+- [Quick Start](docs/QUICKSTART.md)
+- [Deployment](docs/DEPLOYMENT.md)

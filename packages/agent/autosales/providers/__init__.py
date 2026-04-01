@@ -18,6 +18,8 @@ Public surface:
     )
 """
 
+from autosales.providers.anthropic_provider import AnthropicProvider
+from autosales.providers.auth_profiles import AuthProfileStore
 from autosales.providers.base import (
     AuthCredential,
     AuthType,
@@ -27,14 +29,12 @@ from autosales.providers.base import (
     ModelConfig,
 )
 from autosales.providers.config import ProviderConfig, get_config
-from autosales.providers.auth_profiles import AuthProfileStore
-from autosales.providers.registry import ProviderRegistry, get_registry
-from autosales.providers.router import ModelRouter
+from autosales.providers.openai_codex_provider import OpenAICodexProvider
 
 # Concrete providers (also triggers auto-registration via registry import)
 from autosales.providers.openai_provider import OpenAIProvider
-from autosales.providers.openai_codex_provider import OpenAICodexProvider
-from autosales.providers.anthropic_provider import AnthropicProvider
+from autosales.providers.registry import ProviderRegistry, get_registry
+from autosales.providers.router import ModelRouter
 
 __all__ = [
     "AuthType",

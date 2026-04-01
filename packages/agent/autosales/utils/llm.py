@@ -10,8 +10,11 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-import time
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from autosales.providers.base import LLMResponse
+    from autosales.providers.router import ModelRouter
 
 logger = logging.getLogger("autosales.utils.llm")
 
@@ -143,9 +146,9 @@ class LLMClient:
         max_tokens: int = 4096,
         json_mode: bool = False,
         stream: bool = False,
-    ) -> "LLMResponse":
+    ) -> LLMResponse:
         """Like :meth:`call` but returns the full :class:`LLMResponse`."""
-        from autosales.providers.base import LLMRequest, LLMResponse
+        from autosales.providers.base import LLMRequest
 
         effective_model = model or os.environ.get("LLM_MODEL")
 
@@ -175,6 +178,6 @@ class LLMClient:
         }
 
     @property
-    def router(self) -> "ModelRouter":
+    def router(self) -> ModelRouter:
         """Expose the underlying :class:`ModelRouter` for advanced usage."""
         return self._router

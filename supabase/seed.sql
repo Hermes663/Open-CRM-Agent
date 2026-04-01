@@ -5,7 +5,7 @@
 -- =============================================================================
 
 -- Clean existing data (in dependency order)
-TRUNCATE agent_runs, activities, deals, prospects_data CASCADE;
+TRUNCATE agent_runs, agent_memory, follow_up_queue, activities, deals, prospects_data CASCADE;
 
 -- =============================================================================
 -- 1. PROSPECTS DATA (13 prospects from real CSV, anonymized emails)
@@ -196,7 +196,7 @@ WITH deal_refs AS (
   SELECT id AS deal_id, company_name, stage, title
   FROM deals
 )
-INSERT INTO activities (id, deal_id, activity_type, description, body, metadata, agent_name, created_at)
+INSERT INTO activities (id, deal_id, activity_type, subject, body, metadata, created_by, created_at)
 VALUES
   -- Herkkukartano (won) activities
   (gen_random_uuid(),
@@ -333,33 +333,90 @@ VALUES
    '{"source": "inbound_inquiry", "facility_size_m2": 35000, "inquiry_type": "ingredient_supply"}'::jsonb,
    'hermes-orchestrator', '2026-03-29 06:00:00+00');
 
+-- =============================================================================
+-- 4. FOLLOW-UP QUEUE (3 records)
+-- =============================================================================
+WITH followup_deals AS (
+  SELECT id AS deal_id, customer_id, company_name
+  FROM deals
+  WHERE company_name IN (
+    'LuxusniCokolady, SELLLOT s.r.o.',
+    'Inter Conecter Srl',
+    'Foodhub'
+  )
+)
+INSERT INTO follow_up_queue (
+  id, customer_id, deal_id, scheduled_at, template_id, status, sent_at, created_at, attempt, updated_at
+)
+VALUES
+  (
+    gen_random_uuid(),
+    (SELECT customer_id FROM followup_deals WHERE company_name = 'LuxusniCokolady, SELLLOT s.r.o.'),
+    (SELECT deal_id FROM followup_deals WHERE company_name = 'LuxusniCokolady, SELLLOT s.r.o.'),
+    '2026-03-30 09:00:00+00'::timestamptz,
+    'follow_up_2',
+    'pending',
+    NULL,
+    '2026-03-25 09:00:00+00'::timestamptz,
+    2,
+    '2026-03-30 09:00:00+00'::timestamptz
+  ),
+  (
+    gen_random_uuid(),
+    (SELECT customer_id FROM followup_deals WHERE company_name = 'Inter Conecter Srl'),
+    (SELECT deal_id FROM followup_deals WHERE company_name = 'Inter Conecter Srl'),
+    '2026-03-31 08:00:00+00'::timestamptz,
+    'follow_up_3',
+    'pending',
+    NULL,
+    '2026-03-27 08:00:00+00'::timestamptz,
+    3,
+    '2026-03-31 08:00:00+00'::timestamptz
+  ),
+  (
+    gen_random_uuid(),
+    (SELECT customer_id FROM followup_deals WHERE company_name = 'Foodhub'),
+    (SELECT deal_id FROM followup_deals WHERE company_name = 'Foodhub'),
+    '2026-04-01 07:30:00+00'::timestamptz,
+    'follow_up_1',
+    'pending',
+    NULL,
+    '2026-03-29 07:30:00+00'::timestamptz,
+    1,
+    '2026-04-01 07:30:00+00'::timestamptz
+  );
 
 -- =============================================================================
--- 4. AGENT RUNS (5 records)
+-- 5. AGENT RUNS (5 records)
 -- =============================================================================
-INSERT INTO agent_runs (id, agent_name, trigger_type, status, deals_processed, actions_taken, tokens_used, cost_usd, duration_ms, error_message, started_at, completed_at)
+INSERT INTO agent_runs (id, run_type, agent_name, status, input_summary, output_summary, tokens_used, cost_usd, duration_ms, error_message, started_at, completed_at)
 VALUES
   -- Successful daily orchestration run
-  (gen_random_uuid(), 'hermes-orchestrator', 'scheduled', 'completed',
-   8, 12, 45200, 0.68, 34500, NULL,
+  (gen_random_uuid(), 'heartbeat', 'hermes-orchestrator', 'completed',
+   'Heartbeat cycle: 8 active deals scanned', '12 actions taken across pipeline',
+   45200, 0.68, 34500, NULL,
    '2026-03-28 06:00:00+00', '2026-03-28 06:00:34+00'),
 
   -- Research agent batch run
-  (gen_random_uuid(), 'research-agent', 'triggered', 'completed',
-   3, 6, 82100, 1.23, 67800, NULL,
+  (gen_random_uuid(), 'heartbeat', 'research', 'completed',
+   '3 new deals requiring company research', '6 research summaries generated',
+   82100, 1.23, 67800, NULL,
    '2026-03-28 06:01:00+00', '2026-03-28 06:02:08+00'),
 
   -- Email agent run
-  (gen_random_uuid(), 'email-agent', 'triggered', 'completed',
-   5, 5, 31400, 0.47, 22100, NULL,
+  (gen_random_uuid(), 'heartbeat', 'qualifier', 'completed',
+   '5 deals ready for outreach', '5 personalized emails sent',
+   31400, 0.47, 22100, NULL,
    '2026-03-28 06:03:00+00', '2026-03-28 06:03:22+00'),
 
   -- Failed run (API timeout)
-  (gen_random_uuid(), 'hermes-orchestrator', 'manual', 'failed',
-   0, 0, 2100, 0.03, 30000, 'OpenAI API timeout after 30s - deal pipeline refresh failed. Retrying in next scheduled run.',
+  (gen_random_uuid(), 'manual', 'hermes-orchestrator', 'failed',
+   'Manual trigger: full pipeline refresh', NULL,
+   2100, 0.03, 30000, 'OpenAI API timeout after 30s - deal pipeline refresh failed. Retrying in next scheduled run.',
    '2026-03-27 18:00:00+00', '2026-03-27 18:00:30+00'),
 
   -- Successful evening follow-up run
-  (gen_random_uuid(), 'hermes-orchestrator', 'scheduled', 'completed',
-   13, 18, 67800, 1.02, 52300, NULL,
+  (gen_random_uuid(), 'heartbeat', 'hermes-orchestrator', 'completed',
+   'Heartbeat cycle: 13 deals scanned', '18 actions taken including follow-ups',
+   67800, 1.02, 52300, NULL,
    '2026-03-29 06:00:00+00', '2026-03-29 06:00:52+00');

@@ -31,6 +31,7 @@ auth-profiles.json
 *.swo
 *~
 .DS_Store
+CODEX/
 
 # Testing
 coverage/

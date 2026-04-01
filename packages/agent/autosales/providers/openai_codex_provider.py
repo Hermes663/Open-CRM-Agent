@@ -25,7 +25,7 @@ import logging
 import os
 import secrets
 import time
-from typing import Any, Optional
+from typing import Any
 from urllib.parse import urlencode
 
 import httpx
@@ -99,9 +99,9 @@ class OpenAICodexProvider(BaseProvider):
 
     def build_authorization_url(
         self,
-        client_id: Optional[str] = None,
-        redirect_uri: Optional[str] = None,
-        state: Optional[str] = None,
+        client_id: str | None = None,
+        redirect_uri: str | None = None,
+        state: str | None = None,
     ) -> tuple[str, str]:
         """Return ``(url, state)`` -- the URL to open in the user's browser.
 
@@ -126,9 +126,9 @@ class OpenAICodexProvider(BaseProvider):
     async def exchange_code(
         self,
         code: str,
-        client_id: Optional[str] = None,
-        client_secret: Optional[str] = None,
-        redirect_uri: Optional[str] = None,
+        client_id: str | None = None,
+        client_secret: str | None = None,
+        redirect_uri: str | None = None,
     ) -> AuthCredential:
         """Exchange an authorization *code* for access + refresh tokens."""
         cfg = get_config()
@@ -332,7 +332,7 @@ class OpenAICodexProvider(BaseProvider):
         return time.time() >= (credential.expires_at - _TOKEN_EXPIRY_BUFFER)
 
     @staticmethod
-    def _decode_jwt_identity(token: str) -> tuple[Optional[str], Optional[str]]:
+    def _decode_jwt_identity(token: str) -> tuple[str | None, str | None]:
         """Best-effort decode of a JWT to extract ``email`` and ``name``.
 
         Does **not** verify the signature -- that's the token endpoint's job.

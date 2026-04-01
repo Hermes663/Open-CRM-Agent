@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Optional
 
 from autosales.providers.base import BaseProvider
 
@@ -19,7 +18,7 @@ logger = logging.getLogger("autosales.providers.registry")
 class ProviderRegistry:
     """Singleton registry of :class:`BaseProvider` instances."""
 
-    _instance: Optional[ProviderRegistry] = None
+    _instance: ProviderRegistry | None = None
     _providers: dict[str, BaseProvider]
 
     def __new__(cls) -> ProviderRegistry:

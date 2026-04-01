@@ -9,7 +9,7 @@ import imaplib
 import logging
 import os
 import smtplib
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from email.header import decode_header
 from typing import Any
 
@@ -32,15 +32,21 @@ class IMAPSMTPChannel(BaseChannel):
         self._imap_port = int(os.environ.get("IMAP_PORT", "993"))
         self._smtp_host = os.environ.get("SMTP_HOST", "")
         self._smtp_port = int(os.environ.get("SMTP_PORT", "587"))
-        self._user = os.environ.get("EMAIL_USER", "")
-        self._password = os.environ.get("EMAIL_PASSWORD", "")
+        self._imap_user = os.environ.get("IMAP_USER", os.environ.get("EMAIL_USER", ""))
+        self._imap_password = os.environ.get(
+            "IMAP_PASSWORD",
+            os.environ.get("EMAIL_PASSWORD", ""),
+        )
+        self._smtp_user = os.environ.get("SMTP_USER", self._imap_user)
+        self._smtp_password = os.environ.get("SMTP_PASSWORD", self._imap_password)
+        self._use_tls = os.environ.get("SMTP_USE_TLS", "true").lower() == "true"
 
     async def fetch_new_messages(self) -> list[EmailMessage]:
         """Fetch unseen messages from the IMAP inbox."""
         messages: list[EmailMessage] = []
         try:
             conn = imaplib.IMAP4_SSL(self._imap_host, self._imap_port)
-            conn.login(self._user, self._password)
+            conn.login(self._imap_user, self._imap_password)
             conn.select("INBOX")
 
             _, msg_ids = conn.search(None, "UNSEEN")
@@ -70,17 +76,18 @@ class IMAPSMTPChannel(BaseChannel):
         """Send an email via SMTP with STARTTLS."""
         try:
             msg = email.mime.multipart.MIMEMultipart()
-            msg["From"] = self._user
+            msg["From"] = self._smtp_user
             msg["To"] = to
             msg["Subject"] = subject
             msg.attach(email.mime.text.MIMEText(body, "plain", "utf-8"))
 
             with smtplib.SMTP(self._smtp_host, self._smtp_port) as server:
                 server.ehlo()
-                server.starttls()
-                server.ehlo()
-                server.login(self._user, self._password)
-                server.sendmail(self._user, to, msg.as_string())
+                if self._use_tls:
+                    server.starttls()
+                    server.ehlo()
+                server.login(self._smtp_user, self._smtp_password)
+                server.sendmail(self._smtp_user, to, msg.as_string())
 
             logger.info("[imap_smtp] Sent email to %s: %s", to, subject)
             return True
@@ -92,7 +99,7 @@ class IMAPSMTPChannel(BaseChannel):
         """Test IMAP connection."""
         try:
             conn = imaplib.IMAP4_SSL(self._imap_host, self._imap_port)
-            conn.login(self._user, self._password)
+            conn.login(self._imap_user, self._imap_password)
             conn.logout()
             return True
         except Exception:
@@ -138,9 +145,9 @@ class IMAPSMTPChannel(BaseChannel):
         try:
             received_at = email.utils.parsedate_to_datetime(date_str)
             if received_at.tzinfo is None:
-                received_at = received_at.replace(tzinfo=timezone.utc)
+                received_at = received_at.replace(tzinfo=UTC)
         except Exception:
-            received_at = datetime.now(timezone.utc)
+            received_at = datetime.now(UTC)
 
         return EmailMessage(
             from_addr=msg.get("From", ""),

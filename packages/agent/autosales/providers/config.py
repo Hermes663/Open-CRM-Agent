@@ -8,10 +8,8 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field
-from typing import Optional
 
 from autosales.providers.base import ModelConfig
-
 
 # ---------------------------------------------------------------------------
 # Model catalogues (updated prices as of 2025-Q2)
@@ -179,7 +177,10 @@ class ProviderConfig:
 
     # Default provider when model ref has no prefix
     default_provider: str = field(
-        default_factory=lambda: os.environ.get("DEFAULT_LLM_PROVIDER", "anthropic")
+        default_factory=lambda: os.environ.get(
+            "DEFAULT_LLM_PROVIDER",
+            os.environ.get("LLM_PROVIDER", "anthropic"),
+        )
     )
 
     # Default model per provider (overridable via env)
@@ -188,7 +189,8 @@ class ProviderConfig:
     # Fallback chain: try providers in this order when the primary fails
     fallback_chain: list[str] = field(
         default_factory=lambda: os.environ.get(
-            "LLM_FALLBACK_CHAIN", "anthropic,openai"
+            "LLM_FALLBACK_CHAIN",
+            os.environ.get("PROVIDER_FALLBACK_CHAIN", "anthropic,openai"),
         ).split(",")
     )
 
@@ -205,18 +207,28 @@ class ProviderConfig:
     )
 
     # OAuth settings for Codex
-    codex_client_id: Optional[str] = field(
-        default_factory=lambda: os.environ.get("CODEX_OAUTH_CLIENT_ID")
+    codex_client_id: str | None = field(
+        default_factory=lambda: os.environ.get(
+            "CODEX_OAUTH_CLIENT_ID",
+            os.environ.get("OPENAI_CODEX_CLIENT_ID"),
+        )
     )
     codex_redirect_uri: str = field(
         default_factory=lambda: os.environ.get(
-            "CODEX_OAUTH_REDIRECT_URI", "http://localhost:9876/callback"
+            "CODEX_OAUTH_REDIRECT_URI",
+            os.environ.get(
+                "OPENAI_CODEX_REDIRECT_URI",
+                "http://localhost:9876/callback",
+            ),
         )
     )
 
     # Auth profile storage path
-    auth_profile_path: Optional[str] = field(
-        default_factory=lambda: os.environ.get("AUTOSALES_AUTH_PROFILE_PATH")
+    auth_profile_path: str | None = field(
+        default_factory=lambda: os.environ.get(
+            "AUTOSALES_AUTH_PROFILE_PATH",
+            os.environ.get("AUTH_PROFILES_PATH"),
+        )
     )
 
     # Retry / timeout

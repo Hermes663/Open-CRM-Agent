@@ -1,16 +1,17 @@
 "use client";
 
-import { useMemo } from "react";
-import { Play, Plus } from "lucide-react";
-import { useRealtimeDeals } from "@/hooks/useRealtimeDeals";
+import { useMemo, useState } from "react";
+import { Loader2, Play, RotateCcw } from "lucide-react";
+
 import KanbanBoard from "@/components/pipeline/KanbanBoard";
 import PipelineStats from "@/components/pipeline/PipelineStats";
+import { triggerHeartbeat } from "@/lib/api";
 import type { PipelineStats as PipelineStatsType } from "@/lib/types";
+import { useRealtimeDeals } from "@/hooks/useRealtimeDeals";
 
 function PipelineSkeleton() {
   return (
     <div className="animate-pulse space-y-4">
-      {/* Stats skeleton */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {Array.from({ length: 4 }).map((_, i) => (
           <div
@@ -19,7 +20,6 @@ function PipelineSkeleton() {
           />
         ))}
       </div>
-      {/* Board skeleton */}
       <div className="flex gap-3 pt-1">
         {Array.from({ length: 6 }).map((_, i) => (
           <div
@@ -32,7 +32,7 @@ function PipelineSkeleton() {
               {Array.from({ length: 3 }).map((_, j) => (
                 <div
                   key={j}
-                  className="h-[68px] rounded-lg bg-white border border-slate-200"
+                  className="h-[68px] rounded-lg border border-slate-200 bg-white"
                 />
               ))}
             </div>
@@ -44,22 +44,25 @@ function PipelineSkeleton() {
 }
 
 export default function PipelinePage() {
-  const { deals, loading } = useRealtimeDeals();
+  const { deals, loading, refetch, updateDealStage } = useRealtimeDeals();
+  const [refreshing, setRefreshing] = useState(false);
+  const [triggeringHeartbeat, setTriggeringHeartbeat] = useState(false);
 
   const stats: PipelineStatsType = useMemo(() => {
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
     const activeDeals = deals.filter(
-      (d) => d.stage !== "won" && d.stage !== "lost"
+      (deal) => deal.stage !== "won" && deal.stage !== "lost",
     );
     const wonThisMonth = deals.filter(
-      (d) => d.stage === "won" && new Date(d.updated_at) >= monthStart
+      (deal) =>
+        deal.stage === "won" && new Date(deal.updated_at) >= monthStart,
     );
     const closedThisMonth = deals.filter(
-      (d) =>
-        (d.stage === "won" || d.stage === "lost") &&
-        new Date(d.updated_at) >= monthStart
+      (deal) =>
+        (deal.stage === "won" || deal.stage === "lost") &&
+        new Date(deal.updated_at) >= monthStart,
     );
     const winRate =
       closedThisMonth.length > 0
@@ -68,30 +71,65 @@ export default function PipelinePage() {
 
     return {
       total_deals: activeDeals.length,
-      total_value: activeDeals.reduce((sum, d) => sum + d.value, 0),
+      total_value: activeDeals.reduce((sum, deal) => sum + deal.value, 0),
       won_this_month: wonThisMonth.length,
       win_rate: winRate,
     };
   }, [deals]);
 
+  async function handleRefresh() {
+    setRefreshing(true);
+    try {
+      await refetch();
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
+  async function handleRunHeartbeat() {
+    setTriggeringHeartbeat(true);
+    try {
+      await triggerHeartbeat();
+      await refetch();
+    } catch (error) {
+      console.error("Failed to trigger heartbeat:", error);
+    } finally {
+      setTriggeringHeartbeat(false);
+    }
+  }
+
   return (
     <div className="flex h-full flex-col">
-      {/* Top bar */}
       <div className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-3">
         <h1 className="text-lg font-bold text-slate-900">Pipeline</h1>
         <div className="flex items-center gap-2">
-          <button className="btn-secondary text-xs">
-            <Plus className="h-3.5 w-3.5" />
-            Add Deal
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="btn-secondary text-xs"
+          >
+            {refreshing ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <RotateCcw className="h-3.5 w-3.5" />
+            )}
+            {refreshing ? "Refreshing..." : "Refresh"}
           </button>
-          <button className="btn-primary text-xs">
-            <Play className="h-3.5 w-3.5" />
-            Run Agent
+          <button
+            onClick={handleRunHeartbeat}
+            disabled={triggeringHeartbeat}
+            className="btn-primary text-xs"
+          >
+            {triggeringHeartbeat ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Play className="h-3.5 w-3.5" />
+            )}
+            {triggeringHeartbeat ? "Running..." : "Run Heartbeat"}
           </button>
         </div>
       </div>
 
-      {/* Content */}
       <div className="flex-1 overflow-hidden px-6 py-4">
         {loading ? (
           <PipelineSkeleton />
@@ -99,7 +137,7 @@ export default function PipelinePage() {
           <div className="flex h-full flex-col gap-4">
             <PipelineStats stats={stats} />
             <div className="flex-1 overflow-hidden">
-              <KanbanBoard deals={deals} />
+              <KanbanBoard deals={deals} onStageChange={updateDealStage} />
             </div>
           </div>
         )}

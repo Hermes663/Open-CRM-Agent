@@ -3,18 +3,14 @@
 from __future__ import annotations
 
 import logging
-from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from autosales.agents.base import AgentContext
 from autosales.integrations.supabase_client import SupabaseClient
 from autosales.memory.fts_search import search_history
+from autosales.utils.paths import agent_config_dir
 
 logger = logging.getLogger("autosales.memory")
-
-# Paths to static configuration files (relative to project root).
-_SOUL_PATH = Path("agent-config/SOUL.md")
-_KNOWLEDGE_PATH = Path("agent-config/KNOWLEDGE.md")
 
 # Context budget (characters) to avoid overrunning LLM token limits.
 MAX_CONTEXT_CHARS = 80_000
@@ -29,11 +25,12 @@ class MemoryManager:
         self._db = db
         self._soul_cache: str | None = None
         self._knowledge_cache: str | None = None
+        self._config_dir = agent_config_dir()
 
     async def build_context(
         self,
         deal_id: str,
-        query: Optional[str] = None,
+        query: str | None = None,
     ) -> AgentContext:
         """Assemble everything an agent needs into an :class:`AgentContext`.
 
@@ -103,7 +100,7 @@ class MemoryManager:
     async def search_conversations(
         self,
         query: str,
-        customer_id: Optional[str] = None,
+        customer_id: str | None = None,
     ) -> list[dict[str, Any]]:
         """Public convenience wrapper around full-text search."""
         return await search_history(
@@ -134,9 +131,9 @@ class MemoryManager:
         if self._soul_cache is not None:
             return self._soul_cache
         try:
-            self._soul_cache = _SOUL_PATH.read_text(encoding="utf-8")
+            self._soul_cache = (self._config_dir / "SOUL.md").read_text(encoding="utf-8")
         except FileNotFoundError:
-            logger.debug("[memory] SOUL.md not found at %s", _SOUL_PATH)
+            logger.debug("[memory] SOUL.md not found in %s", self._config_dir)
             self._soul_cache = ""
         return self._soul_cache
 
@@ -144,9 +141,11 @@ class MemoryManager:
         if self._knowledge_cache is not None:
             return self._knowledge_cache
         try:
-            self._knowledge_cache = _KNOWLEDGE_PATH.read_text(encoding="utf-8")
+            self._knowledge_cache = (self._config_dir / "KNOWLEDGE.md").read_text(
+                encoding="utf-8"
+            )
         except FileNotFoundError:
-            logger.debug("[memory] KNOWLEDGE.md not found at %s", _KNOWLEDGE_PATH)
+            logger.debug("[memory] KNOWLEDGE.md not found in %s", self._config_dir)
             self._knowledge_cache = ""
         return self._knowledge_cache
 

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from autosales.integrations.supabase_client import SupabaseClient
@@ -14,13 +14,13 @@ logger = logging.getLogger("autosales.memory.fts")
 async def search_history(
     db: SupabaseClient,
     query: str,
-    customer_id: Optional[str] = None,
+    customer_id: str | None = None,
     limit: int = 10,
 ) -> list[dict[str, Any]]:
     """Search conversation history and memories using PostgreSQL full-text search.
 
-    This function calls a Supabase RPC that runs a ``to_tsquery`` search
-    against the ``activities`` and ``agent_memory`` tables.
+    This function runs a PostgreSQL full-text search across the canonical
+    ``activities`` and ``agent_memory`` tables.
 
     Args:
         db: The Supabase client instance.
@@ -38,13 +38,10 @@ async def search_history(
     ts_query = _to_tsquery(query)
 
     try:
-        results = await db.rpc(
-            "search_activities",
-            {
-                "search_query": ts_query,
-                "customer_filter": customer_id,
-                "max_results": limit,
-            },
+        results = await db.search_crm_text(
+            query=ts_query,
+            customer_id=customer_id,
+            limit=limit,
         )
         return results or []
     except Exception:
@@ -56,7 +53,7 @@ async def search_history(
 async def _fallback_search(
     db: SupabaseClient,
     query: str,
-    customer_id: Optional[str],
+    customer_id: str | None,
     limit: int,
 ) -> list[dict[str, Any]]:
     """Simple ILIKE fallback when the RPC is unavailable."""

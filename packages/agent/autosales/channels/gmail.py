@@ -5,7 +5,7 @@ from __future__ import annotations
 import base64
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import Any
@@ -126,7 +126,7 @@ class GmailChannel(BaseChannel):
         if (
             self._access_token
             and self._token_expires
-            and datetime.now(timezone.utc) < self._token_expires
+            and datetime.now(UTC) < self._token_expires
         ):
             return self._access_token
 
@@ -146,7 +146,7 @@ class GmailChannel(BaseChannel):
         expires_in = token_data.get("expires_in", 3600)
         from datetime import timedelta
 
-        self._token_expires = datetime.now(timezone.utc) + timedelta(seconds=expires_in - 60)
+        self._token_expires = datetime.now(UTC) + timedelta(seconds=expires_in - 60)
         logger.debug("[gmail] Refreshed access token (expires in %ds)", expires_in)
         return self._access_token
 
@@ -157,7 +157,10 @@ class GmailChannel(BaseChannel):
     @staticmethod
     def _parse_message(data: dict[str, Any]) -> EmailMessage:
         """Parse a Gmail API message resource into an EmailMessage."""
-        headers = {h["name"].lower(): h["value"] for h in data.get("payload", {}).get("headers", [])}
+        headers = {
+            header["name"].lower(): header["value"]
+            for header in data.get("payload", {}).get("headers", [])
+        }
 
         # Extract body
         body = ""
@@ -194,9 +197,9 @@ class GmailChannel(BaseChannel):
 
                 received_at = parsedate_to_datetime(date_str)
                 if received_at.tzinfo is None:
-                    received_at = received_at.replace(tzinfo=timezone.utc)
+                    received_at = received_at.replace(tzinfo=UTC)
             except Exception:
-                received_at = datetime.now(timezone.utc)
+                received_at = datetime.now(UTC)
 
         return EmailMessage(
             from_addr=headers.get("from", ""),

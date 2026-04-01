@@ -22,6 +22,7 @@ export interface StageConfig {
 // --- Deal ---
 export interface Deal {
   id: string;
+  title?: string | null;
   company_name: string;
   contact_name: string | null;
   contact_email: string | null;
@@ -38,10 +39,12 @@ export interface Deal {
   updated_at: string;
   owner_id: string | null;
   notes: string | null;
+  currency?: string | null;
+  lost_reason?: string | null;
 }
 
 // --- Customer / Prospect ---
-export interface Customer {
+export interface Contact {
   id: string;
   full_name: string;
   company_name: string;
@@ -52,34 +55,31 @@ export interface Customer {
   research_summary?: string | null;
   created_at: string;
   updated_at: string;
+  deal_count?: number;
+  last_contact?: string | null;
 }
 
+export type Customer = Contact;
+
 // --- Activity ---
-export type ActivityType =
-  | "email_sent"
-  | "email_received"
-  | "research_completed"
-  | "stage_changed"
-  | "agent_decision"
-  | "deal_created"
-  | "follow_up_sent"
-  | "note_added"
-  | "call_logged";
+export type ActivityType = string;
 
 export interface Activity {
   id: string;
   deal_id: string;
   activity_type: ActivityType;
   description: string;
+  subject?: string | null;
   body?: string | null;
   metadata?: Record<string, unknown>;
   agent_name: string | null;
+  created_by?: string | null;
   created_at: string;
 }
 
 // --- Deal with relations ---
 export interface DealWithRelations extends Deal {
-  customer: Customer | null;
+  customer: Contact | null;
   activities: Activity[];
 }
 
@@ -100,14 +100,15 @@ export interface PipelineSummary {
 // --- Agent run ---
 export interface AgentRun {
   id: string;
-  agent_name: string;
-  status: "running" | "completed" | "failed";
-  deals_processed: number;
-  actions_taken: number;
+  run_type: string;
+  agent_name: string | null;
+  status: "running" | "completed" | "failed" | "skipped";
+  input_summary: string | null;
+  output_summary: string | null;
+  duration_ms: number | null;
   started_at: string;
   completed_at: string | null;
   error_message: string | null;
-  created_at: string;
 }
 
 // --- Dashboard metrics ---
@@ -125,3 +126,12 @@ export interface DashboardMetrics {
 // --- Supabase helpers ---
 export type DealInsert = Omit<Deal, "id" | "created_at" | "updated_at">;
 export type DealUpdate = Partial<Omit<Deal, "id" | "created_at" | "updated_at">>;
+
+export interface SettingsStatus {
+  database_configured: boolean;
+  heartbeat_interval_minutes: number;
+  email_provider: string | null;
+  email_configured: boolean;
+  llm_provider: string | null;
+  llm_configured: boolean;
+}

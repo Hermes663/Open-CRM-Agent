@@ -114,8 +114,8 @@ AutoSales AI is a fully autonomous AI-powered sales development representative (
 
 ```bash
 # Clone the repository
-git clone https://github.com/adikam/autosales-ai.git
-cd autosales-ai
+git clone https://github.com/Hermes663/Open-CRM-Agent.git
+cd Open-CRM-Agent
 
 # Configure environment
 cp .env.example .env
@@ -184,8 +184,8 @@ AutoSales AI uses a multi-agent architecture where specialized agents handle dif
 | **Research Agent** | Active | Enriches prospect data -- company info, recent news, tech stack, decision-maker identification |
 | **Qualifier Agent** | Active | Analyzes inbound replies for sentiment and intent, scores leads against ICP criteria, updates deal stages |
 | **Follow-up Agent** | Active | Manages multi-step follow-up cadences with context-aware personalized messages, respects timezone and rate limits |
-| **Negotiator Agent** | Planned | Handles objections, proposes solutions, navigates pricing discussions within configured guard rails |
-| **Closer Agent** | Planned | Drives toward commitment, sends proposals, handles logistics |
+| **Negotiation Stage** | Manual in v1 | Visible in the CRM, but not routed to a dedicated automation agent |
+| **Closing Stage** | Manual in v1 | Visible in the CRM, but not routed to a dedicated automation agent |
 
 The **Orchestrator** routes each task to the correct agent based on a decision tree that considers deal stage, conversation history, and whether the task was triggered by the heartbeat daemon, an inbound webhook, or a manual action from the dashboard.
 
@@ -211,7 +211,7 @@ The **Orchestrator** routes each task to the correct agent based on a decision t
 - [ ] A/B testing for email templates and agent strategies
 
 **Phase 3 -- Scale**
-- [ ] Negotiator and Closer agents
+- [ ] Dedicated negotiation and closing agents
 - [ ] Voice call integration
 - [ ] Custom agent builder (no-code UI)
 - [ ] Agent template marketplace

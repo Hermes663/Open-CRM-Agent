@@ -1,185 +1,114 @@
 # Deployment Guide
 
-Deploy AutoSales AI to a VPS for production use. This guide covers single-server deployment with Docker, SSL, and monitoring.
+This guide documents the deployment path that matches the current repository:
 
-## Server Requirements
+- `docker/docker-compose.yml` is the canonical compose file
+- PostgreSQL is the runtime source of truth
+- migrations are SQL files under `supabase/migrations`
+- the agent API lives at `/agent/*`, not `/api/*`
 
-| Resource | Minimum | Recommended |
-|----------|---------|-------------|
-| OS | Ubuntu 22.04 LTS | Ubuntu 24.04 LTS |
-| CPU | 2 vCPUs | 4 vCPUs |
-| RAM | 2 GB | 4 GB |
-| Disk | 20 GB SSD | 40 GB SSD |
-| Network | Public IPv4 | Public IPv4 + IPv6 |
+## Recommended Production Flow
 
-Tested providers: Hetzner, DigitalOcean, Linode, AWS EC2, Vultr.
-
-## Option 1: One-Command Install
-
-SSH into your server and run:
+## 1. Clone the repository
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/adikam/autosales-ai/main/deploy/install.sh | bash
-```
-
-This script will:
-1. Install Docker and Docker Compose
-2. Clone the repository to `/opt/autosales-ai`
-3. Generate secure passwords and secrets
-4. Prompt you for required configuration (domain, email credentials, API keys)
-5. Set up Nginx reverse proxy with SSL (Let's Encrypt)
-6. Create systemd services for auto-start
-7. Start all services
-8. Print your dashboard URL
-
-After installation, open `https://your-domain.com` in your browser.
-
-## Option 2: Manual Install
-
-### Step 1: Install Docker
-
-```bash
-# Update system
-sudo apt update && sudo apt upgrade -y
-
-# Install Docker
-curl -fsSL https://get.docker.com | sh
-sudo usermod -aG docker $USER
-
-# Install Docker Compose plugin
-sudo apt install -y docker-compose-plugin
-
-# Verify installation
-docker --version
-docker compose version
-```
-
-Log out and back in for the group change to take effect.
-
-### Step 2: Clone and Configure
-
-```bash
-# Clone to /opt
-sudo mkdir -p /opt/autosales-ai
-sudo chown $USER:$USER /opt/autosales-ai
-git clone https://github.com/adikam/autosales-ai.git /opt/autosales-ai
+git clone https://github.com/Hermes663/Open-CRM-Agent.git /opt/autosales-ai
 cd /opt/autosales-ai
-
-# Create production environment file
-cp .env.example .env.production
 ```
 
-Edit `.env.production` with your production values:
+## 2. Prepare environment
+
+```bash
+cp .env.example .env
+```
+
+Set at least:
 
 ```env
-# Production settings
-NODE_ENV=production
-APP_SECRET=<generate-a-64-char-random-string>
-NEXT_PUBLIC_API_URL=https://your-domain.com/api
+DATABASE_URL=postgresql://autosales:your_secure_password@db:5432/autosales
+JWT_SECRET=replace_me
+AGENT_API_URL=http://agent:8000
 
-# Database
-DATABASE_URL=postgresql://autosales:<strong-password>@db:5432/autosales
-POSTGRES_PASSWORD=<strong-password>
+LLM_PROVIDER=anthropic
+ANTHROPIC_API_KEY=...
 
-# LLM
-OPENAI_API_KEY=sk-...
-
-# Email provider (configure one)
-OUTLOOK_CLIENT_ID=...
-OUTLOOK_CLIENT_SECRET=...
-OUTLOOK_TENANT_ID=...
-
-# Domain
-DOMAIN=your-domain.com
-ADMIN_EMAIL=admin@your-domain.com
+EMAIL_PROVIDER=imap
+IMAP_HOST=...
+IMAP_USER=...
+IMAP_PASSWORD=...
+SMTP_HOST=...
+SMTP_USER=...
+SMTP_PASSWORD=...
 ```
 
-Generate a secure secret:
+## 3. Start the database first
 
 ```bash
-openssl rand -hex 32
+docker compose -f docker/docker-compose.yml up -d db
 ```
 
-### Step 3: Start Services
+Wait for health:
 
 ```bash
-docker compose -f docker-compose.prod.yml --env-file .env.production up -d
+docker compose -f docker/docker-compose.yml ps
 ```
 
-Verify all containers are running:
+## 4. Apply migrations
 
 ```bash
-docker compose -f docker-compose.prod.yml ps
+bash scripts/db_migrate.sh
 ```
 
-## SSL/HTTPS with Let's Encrypt
-
-### Automatic (via install script)
-
-The one-command install handles SSL automatically using Certbot.
-
-### Manual Setup
+## 5. Start web and agent services
 
 ```bash
-# Install Certbot
-sudo apt install -y certbot python3-certbot-nginx
-
-# Obtain certificate
-sudo certbot --nginx -d your-domain.com -d www.your-domain.com \
-  --non-interactive --agree-tos --email admin@your-domain.com
-
-# Verify auto-renewal
-sudo certbot renew --dry-run
+docker compose -f docker/docker-compose.yml up -d web agent
 ```
 
-Certbot automatically creates a cron job for renewal.
+## 6. Verify runtime health
 
-## Domain Configuration
+```bash
+curl http://localhost:8000/agent/health
+docker compose -f docker/docker-compose.yml ps
+```
 
-### DNS Records
+## Docker Services
 
-Add these records at your DNS provider:
+| Service | Port | Purpose |
+|---------|------|---------|
+| `db` | `5432` | PostgreSQL |
+| `web` | `3000` | Next.js dashboard |
+| `agent` | `8000` | FastAPI agent runtime |
 
-| Type | Name | Value | TTL |
-|------|------|-------|-----|
-| A | `@` | `<your-server-ip>` | 300 |
-| A | `www` | `<your-server-ip>` | 300 |
-| CNAME | `api` | `your-domain.com` | 300 |
+## Reverse Proxy Example
 
-### Nginx Configuration
-
-The install script creates `/etc/nginx/sites-available/autosales-ai`:
+If you front the app with Nginx:
 
 ```nginx
 server {
     listen 80;
-    server_name your-domain.com www.your-domain.com;
-    return 301 https://$server_name$request_uri;
-}
+    server_name your-domain.com;
 
-server {
-    listen 443 ssl http2;
-    server_name your-domain.com www.your-domain.com;
-
-    ssl_certificate /etc/letsencrypt/live/your-domain.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/your-domain.com/privkey.pem;
-
-    # Frontend
     location / {
-        proxy_pass http://localhost:3000;
+        proxy_pass http://127.0.0.1:3000;
         proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_cache_bypass $http_upgrade;
     }
 
-    # Backend API
-    location /api/ {
-        proxy_pass http://localhost:8000/api/;
+    location /agent/ {
+        proxy_pass http://127.0.0.1:8000/agent/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /webhooks/ {
+        proxy_pass http://127.0.0.1:8000/webhooks/;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
@@ -189,229 +118,38 @@ server {
 }
 ```
 
-Enable the site:
+## Upgrade Procedure
 
 ```bash
-sudo ln -s /etc/nginx/sites-available/autosales-ai /etc/nginx/sites-enabled/
-sudo nginx -t
-sudo systemctl reload nginx
-```
-
-## Systemd Services
-
-The install script creates a systemd service for automatic startup and restart:
-
-`/etc/systemd/system/autosales-ai.service`:
-
-```ini
-[Unit]
-Description=AutoSales AI
-Requires=docker.service
-After=docker.service
-
-[Service]
-Type=oneshot
-RemainAfterExit=yes
-WorkingDirectory=/opt/autosales-ai
-ExecStart=/usr/bin/docker compose -f docker-compose.prod.yml --env-file .env.production up -d
-ExecStop=/usr/bin/docker compose -f docker-compose.prod.yml down
-TimeoutStartSec=0
-
-[Install]
-WantedBy=multi-user.target
-```
-
-Manage the service:
-
-```bash
-# Enable auto-start on boot
-sudo systemctl enable autosales-ai
-
-# Start/stop/restart
-sudo systemctl start autosales-ai
-sudo systemctl stop autosales-ai
-sudo systemctl restart autosales-ai
-
-# Check status
-sudo systemctl status autosales-ai
-```
-
-## Monitoring and Logs
-
-### Application Logs
-
-```bash
-# All services
 cd /opt/autosales-ai
-docker compose -f docker-compose.prod.yml logs -f
-
-# Specific service
-docker compose -f docker-compose.prod.yml logs -f engine
-docker compose -f docker-compose.prod.yml logs -f web
-docker compose -f docker-compose.prod.yml logs -f db
+git pull
+pnpm install
+bash scripts/db_migrate.sh
+docker compose -f docker/docker-compose.yml build
+docker compose -f docker/docker-compose.yml up -d
 ```
 
-### Health Check Endpoint
+## Backups
+
+Database dump:
 
 ```bash
-curl https://your-domain.com/api/health
-```
-
-### Resource Monitoring
-
-```bash
-# Container resource usage
-docker stats
-
-# Disk usage
-df -h
-docker system df
-```
-
-### Log Rotation
-
-Docker logs can grow large. Configure log rotation in `/etc/docker/daemon.json`:
-
-```json
-{
-  "log-driver": "json-file",
-  "log-opts": {
-    "max-size": "10m",
-    "max-file": "3"
-  }
-}
-```
-
-Restart Docker after changing:
-
-```bash
-sudo systemctl restart docker
-```
-
-## Backup and Restore
-
-### Database Backup
-
-Create a backup:
-
-```bash
-# Dump the database
-docker compose -f docker-compose.prod.yml exec db \
+docker compose -f docker/docker-compose.yml exec -T db \
   pg_dump -U autosales -d autosales --format=custom \
-  > backup_$(date +%Y%m%d_%H%M%S).dump
+  > autosales_$(date +%Y%m%d_%H%M%S).dump
 ```
 
-### Automated Daily Backups
-
-Add to crontab (`crontab -e`):
-
-```
-0 2 * * * cd /opt/autosales-ai && docker compose -f docker-compose.prod.yml exec -T db pg_dump -U autosales -d autosales --format=custom > /opt/backups/autosales_$(date +\%Y\%m\%d).dump 2>/dev/null && find /opt/backups -name "autosales_*.dump" -mtime +30 -delete
-```
-
-This runs at 2 AM daily and keeps 30 days of backups.
-
-### Restore from Backup
+Restore:
 
 ```bash
-# Stop the application
-docker compose -f docker-compose.prod.yml stop engine web
-
-# Restore the database
-docker compose -f docker-compose.prod.yml exec -T db \
-  pg_restore -U autosales -d autosales --clean --if-exists \
-  < backup_20260101_020000.dump
-
-# Restart
-docker compose -f docker-compose.prod.yml start engine web
+cat autosales_YYYYMMDD_HHMMSS.dump | docker compose -f docker/docker-compose.yml exec -T db \
+  pg_restore -U autosales -d autosales --clean --if-exists
 ```
 
-### Full Server Backup
+## Install Script
 
-For a complete backup including configuration:
+For an interactive bootstrap on a fresh machine:
 
 ```bash
-tar czf autosales-full-backup.tar.gz \
-  /opt/autosales-ai/.env.production \
-  /opt/autosales-ai/docker-compose.prod.yml \
-  /etc/nginx/sites-available/autosales-ai \
-  /opt/backups/
+curl -sSL https://raw.githubusercontent.com/Hermes663/Open-CRM-Agent/main/deploy/install.sh | bash
 ```
-
-## Updating to New Versions
-
-### Standard Update
-
-```bash
-cd /opt/autosales-ai
-
-# Pull latest changes
-git pull origin main
-
-# Rebuild and restart containers
-docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
-
-# Run any new migrations
-docker compose -f docker-compose.prod.yml exec engine python -m alembic upgrade head
-```
-
-### Update with Downtime Window
-
-For major version updates:
-
-```bash
-cd /opt/autosales-ai
-
-# 1. Create a backup first
-docker compose -f docker-compose.prod.yml exec -T db \
-  pg_dump -U autosales -d autosales --format=custom > pre-update-backup.dump
-
-# 2. Stop services
-docker compose -f docker-compose.prod.yml down
-
-# 3. Pull latest code
-git pull origin main
-
-# 4. Rebuild and start
-docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
-
-# 5. Run migrations
-docker compose -f docker-compose.prod.yml exec engine python -m alembic upgrade head
-
-# 6. Verify health
-curl https://your-domain.com/api/health
-```
-
-### Rollback
-
-If an update causes issues:
-
-```bash
-# Check the previous commit
-git log --oneline -5
-
-# Revert to previous version
-git checkout <previous-commit-hash>
-
-# Rebuild
-docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
-
-# Restore database if needed
-docker compose -f docker-compose.prod.yml exec -T db \
-  pg_restore -U autosales -d autosales --clean --if-exists < pre-update-backup.dump
-```
-
-## Security Checklist
-
-Before going to production, verify:
-
-- [ ] Changed the default admin password
-- [ ] Set a strong `APP_SECRET` (64+ random characters)
-- [ ] Set a strong `POSTGRES_PASSWORD`
-- [ ] SSL/HTTPS is active and redirecting HTTP
-- [ ] Firewall rules: only ports 80, 443, and 22 are open
-- [ ] SSH key authentication is enabled (password auth disabled)
-- [ ] Database port (5432) is not exposed to the internet
-- [ ] `.env.production` file permissions: `chmod 600 .env.production`
-- [ ] Automated backups are configured and tested
-- [ ] Log rotation is configured

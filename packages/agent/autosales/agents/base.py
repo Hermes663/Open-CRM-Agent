@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any
 
 
 @dataclass
@@ -44,13 +44,13 @@ class AgentResult:
     action_taken: str
     """Short label describing what the agent did (e.g. ``email_sent``, ``research_complete``)."""
 
-    email_sent: Optional[dict[str, Any]] = None
+    email_sent: dict[str, Any] | None = None
     """If an email was sent: ``{to, subject, body, message_id}``."""
 
-    stage_change: Optional[str] = None
+    stage_change: str | None = None
     """New stage to transition the deal to, or ``None``."""
 
-    activity_log: Optional[str] = None
+    activity_log: str | None = None
     """Human-readable summary for the activity feed."""
 
     metadata: dict[str, Any] = field(default_factory=dict)

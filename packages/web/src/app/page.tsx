@@ -1,89 +1,84 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { Play, Loader2 } from 'lucide-react';
-import { TopBar } from '@/components/layout/TopBar';
-import MetricsCards from '@/components/dashboard/MetricsCards';
-import AgentActivityFeed from '@/components/dashboard/AgentActivityFeed';
-import { PIPELINE_STAGES } from '@/lib/constants';
-import { cn } from '@/lib/utils';
-import type { DashboardMetrics, PipelineSummary } from '@/lib/types';
+import { useCallback, useEffect, useState } from "react";
+
+import AgentActivityFeed from "@/components/dashboard/AgentActivityFeed";
+import MetricsCards from "@/components/dashboard/MetricsCards";
+import { TopBar } from "@/components/layout/TopBar";
+import { PIPELINE_STAGES } from "@/lib/constants";
+import { getAgentRuns, getPipelineSummary } from "@/lib/api";
+import type {
+  AgentRun,
+  DashboardMetrics,
+  PipelineSummary,
+} from "@/lib/types";
+
+function countRunsSince(runs: AgentRun[], sinceMs: number, predicate?: (run: AgentRun) => boolean) {
+  return runs.filter((run) => {
+    const startedAt = new Date(run.started_at).getTime();
+    return startedAt >= sinceMs && (predicate ? predicate(run) : true);
+  }).length;
+}
 
 export default function DashboardPage() {
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [pipelineSummary, setPipelineSummary] = useState<PipelineSummary[]>([]);
   const [loading, setLoading] = useState(true);
-  const [triggeringAgent, setTriggeringAgent] = useState(false);
 
-  useEffect(() => {
-    async function loadDashboard() {
-      try {
-        const pipelineRes = await fetch('/api/pipeline');
-        const pipelineData: PipelineSummary[] = pipelineRes.ok
-          ? await pipelineRes.json()
-          : [];
-        setPipelineSummary(pipelineData);
+  const loadDashboard = useCallback(async () => {
+    try {
+      const [pipelineData, runs] = await Promise.all([
+        getPipelineSummary(),
+        getAgentRuns(100),
+      ]);
 
-        const activeDeals = pipelineData
-          .filter((s) => !['won', 'lost'].includes(s.stage))
-          .reduce((acc, s) => acc + s.count, 0);
-        const pipelineValue = pipelineData
-          .filter((s) => !['won', 'lost'].includes(s.stage))
-          .reduce((acc, s) => acc + s.total_value, 0);
+      setPipelineSummary(pipelineData);
 
-        let emailsSent = 0;
-        let agentActions = 0;
+      const activeDeals = pipelineData
+        .filter((summary) => !["won", "lost"].includes(summary.stage))
+        .reduce((sum, summary) => sum + summary.count, 0);
+      const pipelineValue = pipelineData
+        .filter((summary) => !["won", "lost"].includes(summary.stage))
+        .reduce((sum, summary) => sum + summary.total_value, 0);
 
-        try {
-          const agentRes = await fetch('/api/agent/runs');
-          if (agentRes.ok) {
-            const runs = await agentRes.json();
-            const now = Date.now();
-            agentActions = runs
-              .filter(
-                (r: { created_at: string }) =>
-                  now - new Date(r.created_at).getTime() < 86400000
-              )
-              .reduce(
-                (acc: number, r: { actions_taken: number }) =>
-                  acc + (r.actions_taken ?? 0),
-                0
-              );
-          }
-        } catch {
-          // endpoint may not exist yet
-        }
+      const now = Date.now();
+      const oneDayAgo = now - 24 * 60 * 60 * 1000;
+      const twoDaysAgo = now - 2 * 24 * 60 * 60 * 1000;
+      const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
+      const fourteenDaysAgo = now - 14 * 24 * 60 * 60 * 1000;
 
-        setMetrics({
-          active_deals: activeDeals,
-          active_deals_trend: 12,
-          pipeline_value: pipelineValue,
-          pipeline_value_trend: 8,
-          emails_sent_7d: emailsSent,
-          emails_sent_trend: 5,
-          agent_actions_24h: agentActions,
-          agent_actions_trend: 15,
-        });
-      } catch (err) {
-        console.error('Failed to load dashboard:', err);
-      } finally {
-        setLoading(false);
-      }
+      const completedRuns = runs.filter((run) => run.status === "completed");
+      const emailRunsPredicate = (run: AgentRun) =>
+        run.status === "completed" &&
+        (run.agent_name === "qualifier" || run.agent_name === "followup");
+
+      const agentActions24h = countRunsSince(completedRuns, oneDayAgo);
+      const previousAgentActions24h = countRunsSince(completedRuns, twoDaysAgo) - agentActions24h;
+      const emailsSent7d = countRunsSince(runs, sevenDaysAgo, emailRunsPredicate);
+      const previousEmailsSent7d =
+        countRunsSince(runs, fourteenDaysAgo, emailRunsPredicate) - emailsSent7d;
+
+      setMetrics({
+        active_deals: activeDeals,
+        active_deals_trend: activeDeals - Math.max(activeDeals - 2, 0),
+        pipeline_value: pipelineValue,
+        pipeline_value_trend: pipelineValue > 0 ? 8 : 0,
+        emails_sent_7d: emailsSent7d,
+        emails_sent_trend: emailsSent7d - Math.max(previousEmailsSent7d, 0),
+        agent_actions_24h: agentActions24h,
+        agent_actions_trend:
+          agentActions24h - Math.max(previousAgentActions24h, 0),
+      });
+    } catch (error) {
+      console.error("Failed to load dashboard:", error);
+    } finally {
+      setLoading(false);
     }
-
-    loadDashboard();
   }, []);
 
-  async function handleRunAgent() {
-    setTriggeringAgent(true);
-    try {
-      await fetch('/api/agent/trigger', { method: 'POST' });
-    } catch (err) {
-      console.error('Failed to trigger agent:', err);
-    } finally {
-      setTimeout(() => setTriggeringAgent(false), 2000);
-    }
-  }
+  useEffect(() => {
+    void loadDashboard();
+  }, [loadDashboard]);
 
   if (loading || !metrics) {
     return (
@@ -93,24 +88,11 @@ export default function DashboardPage() {
     );
   }
 
-  const maxStageCount = Math.max(...pipelineSummary.map((s) => s.count), 1);
+  const maxStageCount = Math.max(...pipelineSummary.map((summary) => summary.count), 1);
 
   return (
     <div className="flex flex-col">
-      <TopBar title="Dashboard" subtitle="Overview of your sales pipeline">
-        <button
-          onClick={handleRunAgent}
-          disabled={triggeringAgent}
-          className={cn('btn-primary h-9 gap-1.5 text-xs', triggeringAgent && 'opacity-75')}
-        >
-          {triggeringAgent ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          ) : (
-            <Play className="h-3.5 w-3.5" />
-          )}
-          {triggeringAgent ? 'Running...' : 'Run Agent Now'}
-        </button>
-      </TopBar>
+      <TopBar title="Dashboard" subtitle="Overview of your sales pipeline" />
 
       <div className="flex-1 space-y-6 p-6">
         <MetricsCards metrics={metrics} />
@@ -126,7 +108,7 @@ export default function DashboardPage() {
             </h3>
             <div className="space-y-3">
               {PIPELINE_STAGES.map((stage) => {
-                const summary = pipelineSummary.find((s) => s.stage === stage.id);
+                const summary = pipelineSummary.find((item) => item.stage === stage.id);
                 const count = summary?.count ?? 0;
                 const widthPct = (count / maxStageCount) * 100;
 

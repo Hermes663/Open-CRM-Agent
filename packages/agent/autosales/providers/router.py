@@ -6,17 +6,12 @@ Inspired by OpenClaw's ``model-selection.ts``.
 
 from __future__ import annotations
 
-import asyncio
 import logging
-import time
-from dataclasses import dataclass, field
-from typing import Optional
+from dataclasses import dataclass
 
 from autosales.providers.auth_profiles import AuthProfileStore
 from autosales.providers.base import (
-    AuthCredential,
     AuthType,
-    BaseProvider,
     LLMRequest,
     LLMResponse,
 )
@@ -76,9 +71,9 @@ class ModelRouter:
 
     def __init__(
         self,
-        registry: Optional[ProviderRegistry] = None,
-        auth_store: Optional[AuthProfileStore] = None,
-        fallback_chain: Optional[list[str]] = None,
+        registry: ProviderRegistry | None = None,
+        auth_store: AuthProfileStore | None = None,
+        fallback_chain: list[str] | None = None,
     ) -> None:
         self._registry = registry or get_registry()
         self._auth_store = auth_store or AuthProfileStore()
@@ -133,7 +128,7 @@ class ModelRouter:
             if pid not in candidates:
                 candidates.append(pid)
 
-        last_error: Optional[Exception] = None
+        last_error: Exception | None = None
 
         for pid in candidates:
             try:

@@ -11,8 +11,6 @@ import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import AsyncIterator, Optional
-
 
 # ---------------------------------------------------------------------------
 # Enums
@@ -52,17 +50,17 @@ class AuthCredential:
     auth_type: AuthType
 
     # --- API-key auth ---
-    api_key: Optional[str] = None
+    api_key: str | None = None
 
     # --- OAuth auth (Codex, future providers) ---
-    access_token: Optional[str] = None
-    refresh_token: Optional[str] = None
-    expires_at: Optional[float] = None  # Unix timestamp
-    email: Optional[str] = None
-    display_name: Optional[str] = None
+    access_token: str | None = None
+    refresh_token: str | None = None
+    expires_at: float | None = None  # Unix timestamp
+    email: str | None = None
+    display_name: str | None = None
 
     # --- Metadata ---
-    created_at: Optional[float] = field(default_factory=time.time)
+    created_at: float | None = field(default_factory=time.time)
 
     # ------------------------------------------------------------------
 
@@ -125,7 +123,7 @@ class LLMRequest:
 
     system_prompt: str
     user_message: str
-    model: Optional[str] = None
+    model: str | None = None
     temperature: float = 0.3
     max_tokens: int = 4_096
     json_mode: bool = False

@@ -2,17 +2,21 @@
 
 import { useCallback, useMemo } from "react";
 import { DragDropContext, type DropResult } from "@hello-pangea/dnd";
-import { supabase } from "@/lib/supabase";
+
 import { PIPELINE_STAGES } from "@/lib/constants";
 import type { Deal, PipelineStage } from "@/lib/types";
+
 import StageColumn from "./StageColumn";
 
 interface KanbanBoardProps {
   deals: Deal[];
+  onStageChange: (dealId: string, stage: PipelineStage) => Promise<void>;
 }
 
-export default function KanbanBoard({ deals }: KanbanBoardProps) {
-  // Group deals by stage
+export default function KanbanBoard({
+  deals,
+  onStageChange,
+}: KanbanBoardProps) {
   const dealsByStage = useMemo(() => {
     const grouped: Record<PipelineStage, Deal[]> = {
       new_deal: [],
@@ -24,18 +28,23 @@ export default function KanbanBoard({ deals }: KanbanBoardProps) {
       won: [],
       lost: [],
     };
+
     for (const deal of deals) {
       if (grouped[deal.stage]) {
         grouped[deal.stage].push(deal);
       }
     }
+
     return grouped;
   }, [deals]);
 
-  const onDragEnd = useCallback(
+  const handleDragEnd = useCallback(
     async (result: DropResult) => {
       const { draggableId, destination, source } = result;
-      if (!destination) return;
+      if (!destination) {
+        return;
+      }
+
       if (
         destination.droppableId === source.droppableId &&
         destination.index === source.index
@@ -43,28 +52,21 @@ export default function KanbanBoard({ deals }: KanbanBoardProps) {
         return;
       }
 
-      const newStage = destination.droppableId as PipelineStage;
-
-      // Optimistic: we rely on realtime subscription to update state
-      const { error } = await supabase
-        .from("deals")
-        .update({
-          stage: newStage,
-          stage_entered_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", draggableId);
-
-      if (error) {
+      try {
+        await onStageChange(
+          draggableId,
+          destination.droppableId as PipelineStage,
+        );
+      } catch (error) {
         console.error("Failed to update deal stage:", error);
       }
     },
-    []
+    [onStageChange],
   );
 
   return (
-    <DragDropContext onDragEnd={onDragEnd}>
-      <div className="flex gap-3 overflow-x-auto pb-4 pt-1 px-1">
+    <DragDropContext onDragEnd={handleDragEnd}>
+      <div className="flex gap-3 overflow-x-auto px-1 pb-4 pt-1">
         {PIPELINE_STAGES.map((stage) => (
           <StageColumn
             key={stage.id}

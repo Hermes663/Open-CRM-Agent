@@ -11,9 +11,7 @@ import base64
 import json
 import logging
 import os
-import time
 from pathlib import Path
-from typing import Optional
 
 from autosales.providers.base import AuthCredential, AuthType
 
@@ -38,8 +36,11 @@ class AuthProfileStore:
     plain-text at rest.
     """
 
-    def __init__(self, path: Optional[str | Path] = None) -> None:
-        env_path = os.environ.get("AUTOSALES_AUTH_PROFILE_PATH")
+    def __init__(self, path: str | Path | None = None) -> None:
+        env_path = os.environ.get(
+            "AUTOSALES_AUTH_PROFILE_PATH",
+            os.environ.get("AUTH_PROFILES_PATH"),
+        )
         if path is not None:
             self._path = Path(path)
         elif env_path:
@@ -60,7 +61,7 @@ class AuthProfileStore:
         self._flush()
         logger.info("Saved credential for provider %s", credential.provider_id)
 
-    def get_credential(self, provider_id: str) -> Optional[AuthCredential]:
+    def get_credential(self, provider_id: str) -> AuthCredential | None:
         """Return stored credential, falling back to environment variables."""
         # 1. Explicit stored profile
         raw = self._profiles.get(provider_id)

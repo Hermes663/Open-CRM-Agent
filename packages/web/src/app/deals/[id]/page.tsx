@@ -1,13 +1,14 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
-import { TopBar } from '@/components/layout/TopBar';
-import DealInfoCard from '@/components/deals/DealInfoCard';
-import ActivityTimeline from '@/components/deals/ActivityTimeline';
-import ContactCard from '@/components/deals/ContactCard';
-import QuickActions from '@/components/deals/QuickActions';
-import type { DealWithRelations, PipelineStage } from '@/lib/types';
+import { useCallback, useEffect, useState } from "react";
+import { useParams } from "next/navigation";
+
+import ActivityTimeline from "@/components/deals/ActivityTimeline";
+import ContactCard from "@/components/deals/ContactCard";
+import DealInfoCard from "@/components/deals/DealInfoCard";
+import QuickActions from "@/components/deals/QuickActions";
+import { TopBar } from "@/components/layout/TopBar";
+import type { DealWithRelations, PipelineStage } from "@/lib/types";
 
 export default function DealDetailPage() {
   const params = useParams();
@@ -17,37 +18,50 @@ export default function DealDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function loadDeal() {
-      try {
-        const res = await fetch(`/api/deals/${dealId}`);
-        if (!res.ok) throw new Error('Deal not found');
-        const data = await res.json();
-        setDeal(data);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load deal');
-      } finally {
-        setLoading(false);
+  const loadDeal = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/deals/${dealId}`);
+      if (!response.ok) {
+        throw new Error("Deal not found");
       }
-    }
 
-    if (dealId) loadDeal();
+      const data = (await response.json()) as DealWithRelations;
+      setDeal(data);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load deal");
+    } finally {
+      setLoading(false);
+    }
   }, [dealId]);
 
+  useEffect(() => {
+    if (dealId) {
+      void loadDeal();
+    }
+  }, [dealId, loadDeal]);
+
   async function handleStageChange(newStage: PipelineStage) {
-    if (!deal) return;
+    if (!deal) {
+      return;
+    }
+
     try {
-      const res = await fetch(`/api/deals/${dealId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch(`/api/deals/${dealId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ stage: newStage }),
       });
-      if (res.ok) {
-        const updated = await res.json();
-        setDeal((prev) => (prev ? { ...prev, ...updated } : prev));
+
+      if (!response.ok) {
+        throw new Error("Failed to update stage");
       }
+
+      const updated = await response.json();
+      setDeal((current) => (current ? { ...current, ...updated } : current));
+      await loadDeal();
     } catch (err) {
-      console.error('Failed to update stage:', err);
+      console.error("Failed to update stage:", err);
     }
   }
 
@@ -64,7 +78,7 @@ export default function DealDetailPage() {
       <div className="flex h-full flex-col">
         <TopBar title="Deal Not Found" backHref="/pipeline" />
         <div className="flex flex-1 items-center justify-center">
-          <p className="text-slate-500">{error ?? 'Deal not found'}</p>
+          <p className="text-slate-500">{error ?? "Deal not found"}</p>
         </div>
       </div>
     );
@@ -80,23 +94,21 @@ export default function DealDetailPage() {
 
       <div className="flex-1 p-6">
         <div className="flex gap-6">
-          {/* Left column: Deal Info */}
           <div className="w-[300px] shrink-0">
             <DealInfoCard deal={deal} onStageChange={handleStageChange} />
           </div>
 
-          {/* Center column: Activity Timeline */}
           <div className="min-w-0 flex-1">
             <ActivityTimeline activities={deal.activities} />
           </div>
 
-          {/* Right column: Contact + Quick Actions */}
           <div className="w-[300px] shrink-0 space-y-4">
             <ContactCard customer={deal.customer} />
             <QuickActions
               dealId={deal.id}
               currentStage={deal.stage}
               onStageChange={handleStageChange}
+              onRefresh={loadDeal}
             />
           </div>
         </div>

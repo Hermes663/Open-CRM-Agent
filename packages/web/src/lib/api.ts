@@ -1,165 +1,93 @@
-import { createClient } from "./supabase";
 import type {
-  Deal,
-  DealWithRelations,
   Activity,
   AgentRun,
-  PipelineSummary,
+  Contact,
+  Deal,
+  DealWithRelations,
   DealStage,
+  PipelineSummary,
+  SettingsStatus,
 } from "./types";
 
-const supabase = createClient();
-
-/* ------------------------------------------------------------------ */
-/*  Deals                                                              */
-/* ------------------------------------------------------------------ */
-
-export async function getDeals(stage?: DealStage): Promise<Deal[]> {
-  let query = supabase
-    .from("deals")
-    .select("*")
-    .order("updated_at", { ascending: false });
-
-  if (stage) {
-    query = query.eq("stage", stage);
-  }
-
-  const { data, error } = await query;
-  if (error) throw error;
-  return (data ?? []) as Deal[];
-}
-
-export async function getDeal(id: string): Promise<DealWithRelations> {
-  const { data: deal, error: dealError } = await supabase
-    .from("deals")
-    .select("*")
-    .eq("id", id)
-    .single();
-
-  if (dealError) throw dealError;
-
-  const [customerResult, activitiesResult] = await Promise.all([
-    deal.customer_id
-      ? supabase
-          .from("prospects_data")
-          .select("*")
-          .eq("id", deal.customer_id)
-          .single()
-      : Promise.resolve({ data: null, error: null }),
-    supabase
-      .from("activities")
-      .select("*")
-      .eq("deal_id", id)
-      .order("created_at", { ascending: false }),
-  ]);
-
-  return {
-    ...deal,
-    customer: customerResult.data ?? null,
-    activities: (activitiesResult.data ?? []) as Activity[],
-  } as DealWithRelations;
-}
-
-export async function updateDeal(
-  id: string,
-  data: Partial<Deal>
-): Promise<Deal> {
-  const { data: updated, error } = await supabase
-    .from("deals")
-    .update({ ...data, updated_at: new Date().toISOString() })
-    .eq("id", id)
-    .select()
-    .single();
-
-  if (error) throw error;
-  return updated as Deal;
-}
-
-/* ------------------------------------------------------------------ */
-/*  Activities                                                         */
-/* ------------------------------------------------------------------ */
-
-export async function getActivities(dealId: string): Promise<Activity[]> {
-  const { data, error } = await supabase
-    .from("activities")
-    .select("*")
-    .eq("deal_id", dealId)
-    .order("created_at", { ascending: false });
-
-  if (error) throw error;
-  return (data ?? []) as Activity[];
-}
-
-export async function getRecentActivities(
-  limit: number = 20
-): Promise<Activity[]> {
-  const { data, error } = await supabase
-    .from("activities")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .limit(limit);
-
-  if (error) throw error;
-  return (data ?? []) as Activity[];
-}
-
-/* ------------------------------------------------------------------ */
-/*  Pipeline                                                           */
-/* ------------------------------------------------------------------ */
-
-export async function getPipelineSummary(): Promise<PipelineSummary[]> {
-  const { data, error } = await supabase.from("deals").select("stage, value_pln");
-
-  if (error) throw error;
-
-  const summaryMap = new Map<DealStage, PipelineSummary>();
-
-  for (const deal of data ?? []) {
-    const existing = summaryMap.get(deal.stage as DealStage);
-    if (existing) {
-      existing.count += 1;
-      existing.total_value += deal.value_pln ?? 0;
-    } else {
-      summaryMap.set(deal.stage as DealStage, {
-        stage: deal.stage as DealStage,
-        count: 1,
-        total_value: deal.value_pln ?? 0,
-      });
-    }
-  }
-
-  return Array.from(summaryMap.values());
-}
-
-/* ------------------------------------------------------------------ */
-/*  Agent runs                                                         */
-/* ------------------------------------------------------------------ */
-
-export async function getAgentRuns(limit: number = 10): Promise<AgentRun[]> {
-  const { data, error } = await supabase
-    .from("agent_runs")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .limit(limit);
-
-  if (error) throw error;
-  return (data ?? []) as AgentRun[];
-}
-
-/* ------------------------------------------------------------------ */
-/*  Agent control                                                      */
-/* ------------------------------------------------------------------ */
-
-const AGENT_API_URL =
-  process.env.NEXT_PUBLIC_AGENT_API_URL ?? "http://localhost:8000";
-
-export async function triggerHeartbeat(): Promise<void> {
-  const response = await fetch(`${AGENT_API_URL}/api/heartbeat`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
+async function requestJson<T>(input: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(input, {
+    ...init,
+    headers: {
+      "Content-Type": "application/json",
+      ...(init?.headers ?? {}),
+    },
   });
 
   if (!response.ok) {
-    throw new Error(`Agent heartbeat failed: ${response.statusText}`);
+    const body = await response.text();
+    throw new Error(body || `Request failed with status ${response.status}`);
   }
+
+  return (await response.json()) as T;
+}
+
+export async function getDeals(stage?: DealStage): Promise<Deal[]> {
+  const params = stage ? `?stage=${encodeURIComponent(stage)}` : "";
+  return requestJson<Deal[]>(`/api/deals${params}`);
+}
+
+export async function getDeal(id: string): Promise<DealWithRelations> {
+  return requestJson<DealWithRelations>(`/api/deals/${id}`);
+}
+
+export async function updateDeal(id: string, data: Partial<Deal>): Promise<Deal> {
+  return requestJson<Deal>(`/api/deals/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function getActivities(dealId: string): Promise<Activity[]> {
+  return requestJson<Activity[]>(`/api/deals/${dealId}/activities`);
+}
+
+export async function addActivity(
+  dealId: string,
+  data: {
+    activity_type: string;
+    description?: string | null;
+    body?: string | null;
+    metadata?: Record<string, unknown>;
+    agent_name?: string | null;
+    created_by?: string | null;
+  },
+): Promise<Activity> {
+  return requestJson<Activity>(`/api/deals/${dealId}/activities`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function getPipelineSummary(): Promise<PipelineSummary[]> {
+  return requestJson<PipelineSummary[]>("/api/pipeline");
+}
+
+export async function getContacts(): Promise<Contact[]> {
+  return requestJson<Contact[]>("/api/contacts");
+}
+
+export async function getAgentRuns(limit = 20): Promise<AgentRun[]> {
+  return requestJson<AgentRun[]>(`/api/agent/runs?limit=${limit}`);
+}
+
+export async function triggerHeartbeat(): Promise<void> {
+  await requestJson("/api/agent/trigger", {
+    method: "POST",
+  });
+}
+
+export async function runAgent(agentName: string, dealId: string): Promise<unknown> {
+  return requestJson(`/api/agent/run/${agentName}`, {
+    method: "POST",
+    body: JSON.stringify({ deal_id: dealId }),
+  });
+}
+
+export async function getSettingsStatus(): Promise<SettingsStatus> {
+  return requestJson<SettingsStatus>("/api/settings/status");
 }

@@ -7,7 +7,8 @@ import logging
 import time
 from typing import Any
 
-from autosales.agents.base import AgentContext, AgentResult, BaseAgent
+from autosales.agents.base import AgentResult, BaseAgent
+from autosales.channels.base import BaseChannel
 from autosales.integrations.supabase_client import SupabaseClient
 from autosales.memory.manager import MemoryManager
 
@@ -38,6 +39,13 @@ class AgentRunner:
         self._db = db
         self._memory = memory
         self._agent_cache: dict[str, BaseAgent] = {}
+        self._channel: BaseChannel | None = None
+
+    def set_channel(self, channel: BaseChannel | None) -> None:
+        """Inject the currently configured email channel into future agent instances."""
+        self._channel = channel
+        for agent in self._agent_cache.values():
+            agent._channel = channel
 
     async def run(
         self,
@@ -86,15 +94,14 @@ class AgentRunner:
         # 4. Persist activity
         elapsed_ms = int((time.monotonic() - t0) * 1000)
         try:
+            activity_type = self._activity_type_for_result(agent_name, result)
             await self._db.create_activity(
                 deal_id=deal_id,
-                activity_type=agent_name,
-                direction="outbound",
-                content=result.activity_log or result.action_taken,
-                metadata={
-                    **(result.metadata or {}),
-                    "elapsed_ms": elapsed_ms,
-                },
+                activity_type=activity_type,
+                subject=result.activity_log or result.action_taken,
+                body=result.email_sent.get("body") if result.email_sent else None,
+                metadata={**(result.metadata or {}), "agent_name": agent_name},
+                created_by=f"{agent_name}-agent",
             )
         except Exception:
             logger.exception("[runner] Failed to persist activity for deal %s", deal_id)
@@ -126,7 +133,17 @@ class AgentRunner:
         module = importlib.import_module(module_path)
         cls = getattr(module, class_name)
 
-        instance: BaseAgent = cls(db=self._db)
+        instance: BaseAgent = cls(db=self._db, channel=self._channel)
         self._agent_cache[agent_name] = instance
         logger.debug("[runner] Loaded agent class %s.%s", module_path, class_name)
         return instance
+
+    @staticmethod
+    def _activity_type_for_result(agent_name: str, result: AgentResult) -> str:
+        if agent_name == "research":
+            return "research_completed"
+        if agent_name == "followup" and result.email_sent:
+            return "follow_up_sent"
+        if result.email_sent:
+            return "email_sent"
+        return "agent_decision"

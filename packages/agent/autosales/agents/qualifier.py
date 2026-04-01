@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import json
 import logging
+from datetime import datetime
 from typing import Any
 
 from autosales.agents.base import AgentContext, AgentResult, BaseAgent
+from autosales.channels.base import BaseChannel
 from autosales.integrations.supabase_client import SupabaseClient
 from autosales.utils.llm import LLMClient
 from autosales.utils.templates import EmailTemplateEngine
@@ -33,8 +35,9 @@ Return ONLY a JSON object:
 class QualifierAgent(BaseAgent):
     """Generates personalised outreach or follow-up qualification emails."""
 
-    def __init__(self, db: SupabaseClient) -> None:
+    def __init__(self, db: SupabaseClient, channel: BaseChannel | None = None) -> None:
         self._db = db
+        self._channel = channel
         self._llm = LLMClient()
         self._templates = EmailTemplateEngine()
 
@@ -54,7 +57,7 @@ class QualifierAgent(BaseAgent):
         deal = context.deal
         customer = context.customer or {}
         deal_id = deal.get("id", "unknown")
-        contact_email = customer.get("email") or deal.get("email", "")
+        contact_email = customer.get("email") or deal.get("contact_email", "")
         contact_name = customer.get("name") or deal.get("contact_name", "Unknown")
 
         if not contact_email:
@@ -72,7 +75,7 @@ class QualifierAgent(BaseAgent):
 
         user_message = (
             f"Contact: {contact_name} ({contact_email})\n"
-            f"Company: {customer.get('company', 'Unknown')}\n"
+            f"Company: {customer.get('company', deal.get('company_name', 'Unknown'))}\n"
             f"Deal stage: {deal.get('stage', 'unknown')}\n\n"
             f"--- Research ---\n{json.dumps(research_memories, default=str)}\n\n"
             f"--- Conversation so far ---\n{conversation_summary}\n\n"
@@ -126,7 +129,10 @@ class QualifierAgent(BaseAgent):
 
         if new_stage:
             try:
-                await self._db.update_deal(deal_id, {"stage": new_stage})
+                await self._db.update_deal(
+                    deal_id,
+                    {"stage": new_stage, "stage_entered_at": datetime.utcnow()},
+                )
             except Exception:
                 logger.exception("[qualifier] Failed to update stage for deal %s", deal_id)
 
@@ -159,7 +165,9 @@ class QualifierAgent(BaseAgent):
         cleaned = raw.strip()
         if cleaned.startswith("```"):
             lines = cleaned.split("\n")
-            lines = [l for l in lines if not l.strip().startswith("```")]
+            lines = [
+                line for line in lines if not line.strip().startswith("```")
+            ]
             cleaned = "\n".join(lines)
         try:
             return json.loads(cleaned)

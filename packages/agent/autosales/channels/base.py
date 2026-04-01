@@ -5,7 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 
 @dataclass
@@ -16,10 +16,10 @@ class EmailMessage:
     to_addr: str
     subject: str
     body: str
-    html_body: Optional[str] = None
+    html_body: str | None = None
     attachments: list[dict[str, Any]] = field(default_factory=list)
-    received_at: Optional[datetime] = None
-    message_id: Optional[str] = None
+    received_at: datetime | None = None
+    message_id: str | None = None
 
 
 class BaseChannel(ABC):

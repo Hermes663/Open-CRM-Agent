@@ -1,57 +1,80 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { supabase } from "@/lib/supabase";
-import type { Deal } from "@/lib/types";
+import { useCallback, useEffect, useState } from "react";
+
+import { getDeals, updateDeal } from "@/lib/api";
+import type { Deal, PipelineStage } from "@/lib/types";
+
+const DEALS_POLL_INTERVAL_MS = 15000;
 
 export function useRealtimeDeals() {
   const [deals, setDeals] = useState<Deal[]>([]);
   const [loading, setLoading] = useState(true);
+  const [updatingDealId, setUpdatingDealId] = useState<string | null>(null);
 
   const fetchDeals = useCallback(async () => {
-    const { data, error } = await supabase
-      .from("deals")
-      .select("*")
-      .order("created_at", { ascending: false });
-
-    if (error) {
-      console.error("Error fetching deals:", error);
-      return;
+    try {
+      const data = await getDeals();
+      setDeals(data);
+    } catch (error) {
+      console.error("Failed to fetch deals:", error);
+    } finally {
+      setLoading(false);
     }
-    setDeals((data as Deal[]) ?? []);
-    setLoading(false);
   }, []);
 
-  useEffect(() => {
-    fetchDeals();
+  const updateDealStage = useCallback(
+    async (dealId: string, stage: PipelineStage) => {
+      const previousDeals = deals;
+      const optimisticUpdatedAt = new Date().toISOString();
 
-    const channel = supabase
-      .channel("deals-realtime")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "deals" },
-        (payload) => {
-          if (payload.eventType === "INSERT") {
-            setDeals((prev) => [payload.new as Deal, ...prev]);
-          } else if (payload.eventType === "UPDATE") {
-            setDeals((prev) =>
-              prev.map((d) =>
-                d.id === (payload.new as Deal).id ? (payload.new as Deal) : d
-              )
-            );
-          } else if (payload.eventType === "DELETE") {
-            setDeals((prev) =>
-              prev.filter((d) => d.id !== (payload.old as Deal).id)
-            );
-          }
-        }
-      )
-      .subscribe();
+      setUpdatingDealId(dealId);
+      setDeals((current) =>
+        current.map((deal) =>
+          deal.id === dealId
+            ? {
+                ...deal,
+                stage,
+                stage_entered_at: optimisticUpdatedAt,
+                updated_at: optimisticUpdatedAt,
+              }
+            : deal,
+        ),
+      );
+
+      try {
+        const updatedDeal = await updateDeal(dealId, { stage });
+        setDeals((current) =>
+          current.map((deal) => (deal.id === dealId ? updatedDeal : deal)),
+        );
+      } catch (error) {
+        console.error("Failed to update deal stage:", error);
+        setDeals(previousDeals);
+        throw error;
+      } finally {
+        setUpdatingDealId(null);
+      }
+    },
+    [deals],
+  );
+
+  useEffect(() => {
+    void fetchDeals();
+
+    const interval = window.setInterval(() => {
+      void fetchDeals();
+    }, DEALS_POLL_INTERVAL_MS);
 
     return () => {
-      supabase.removeChannel(channel);
+      window.clearInterval(interval);
     };
   }, [fetchDeals]);
 
-  return { deals, loading, refetch: fetchDeals };
+  return {
+    deals,
+    loading,
+    updatingDealId,
+    refetch: fetchDeals,
+    updateDealStage,
+  };
 }

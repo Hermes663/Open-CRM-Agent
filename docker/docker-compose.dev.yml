@@ -1,60 +1,48 @@
-version: "3.8"
-
-# ===========================================================
-# AutoSales AI - Development Docker Compose Override
-# ===========================================================
-# Usage:
-#   docker compose -f docker/docker-compose.yml -f docker/docker-compose.dev.yml up
-# ===========================================================
-
 services:
-  # ---------------------------------------------------------
-  # PostgreSQL (same as production)
-  # ---------------------------------------------------------
   db:
     ports:
       - "5432:5432"
 
-  # ---------------------------------------------------------
-  # Next.js - Development Mode with Hot Reload
-  # ---------------------------------------------------------
   web:
     build:
       context: ..
       dockerfile: docker/Dockerfile.web
-      target: builder
+      target: deps
     container_name: autosales-web-dev
-    command: pnpm dev
+    working_dir: /app
+    command: >
+      sh -lc "pnpm install --frozen-lockfile &&
+      pnpm --filter autosales-web dev --hostname 0.0.0.0"
     ports:
       - "3000:3000"
     environment:
       - NODE_ENV=development
       - NEXT_TELEMETRY_DISABLED=1
+      - DATABASE_URL=postgresql://autosales:${DB_PASSWORD:-change_me_in_production}@db:5432/autosales
+      - AGENT_API_URL=http://agent:8000
     volumes:
-      - ../packages/web:/app/packages/web
-      - ../packages/web/node_modules:/app/packages/web/node_modules
-      - /app/packages/web/.next
+      - ..:/app
+      - web_node_modules:/app/node_modules
+      - web_package_node_modules:/app/packages/web/node_modules
 
-  # ---------------------------------------------------------
-  # Python Agent - Development Mode with Auto-Reload
-  # ---------------------------------------------------------
   agent:
     build:
       context: ..
       dockerfile: docker/Dockerfile.agent
     container_name: autosales-agent-dev
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    working_dir: /app/packages/agent
+    command: >
+      sh -lc "pip install --no-cache-dir -e '.[dev]' &&
+      uvicorn autosales.main:app --host 0.0.0.0 --port 8000 --reload"
     ports:
       - "8000:8000"
     environment:
       - AGENT_LOG_LEVEL=DEBUG
+      - DATABASE_URL=postgresql://autosales:${DB_PASSWORD:-change_me_in_production}@db:5432/autosales
+      - AGENT_CONFIG_DIR=/app/agent-config
     volumes:
-      - ../packages/agent:/app/packages/agent
-      - ../agent-config:/app/agent-config
+      - ..:/app
 
-  # ---------------------------------------------------------
-  # pgAdmin - Database Management UI
-  # ---------------------------------------------------------
   pgadmin:
     image: dpage/pgadmin4:latest
     container_name: autosales-pgadmin
@@ -74,4 +62,8 @@ services:
 
 volumes:
   pgadmin_data:
+    driver: local
+  web_node_modules:
+    driver: local
+  web_package_node_modules:
     driver: local

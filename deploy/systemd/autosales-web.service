@@ -1,6 +1,6 @@
 [Unit]
 Description=AutoSales AI - Web Dashboard (Next.js)
-Documentation=https://github.com/adikam/autosales-ai
+Documentation=https://github.com/Hermes663/Open-CRM-Agent
 After=network.target autosales-agent.service
 Wants=autosales-agent.service
 

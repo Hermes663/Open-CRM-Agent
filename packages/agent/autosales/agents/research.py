@@ -4,17 +4,15 @@ from __future__ import annotations
 
 import json
 import logging
-from pathlib import Path
 from typing import Any
 
 from autosales.agents.base import AgentContext, AgentResult, BaseAgent
+from autosales.channels.base import BaseChannel
 from autosales.integrations.supabase_client import SupabaseClient
 from autosales.utils.llm import LLMClient
+from autosales.utils.paths import agent_config_dir
 
 logger = logging.getLogger("autosales.agents.research")
-
-# Path to the research prompt template (relative to repo root).
-_PROMPT_PATH = Path("agent-config/prompts/research.md")
 
 _DEFAULT_RESEARCH_PROMPT = """\
 You are a B2B sales research analyst. Given the company and contact information
@@ -37,9 +35,11 @@ Return ONLY valid JSON with these keys:
 class ResearchAgent(BaseAgent):
     """Performs pre-outreach research on a prospect company and contact."""
 
-    def __init__(self, db: SupabaseClient) -> None:
+    def __init__(self, db: SupabaseClient, channel: BaseChannel | None = None) -> None:
         self._db = db
+        self._channel = channel
         self._llm = LLMClient()
+        self._prompt_path = agent_config_dir() / "prompts" / "research.md"
         self._prompt = self._load_prompt()
 
     @property
@@ -64,7 +64,7 @@ class ResearchAgent(BaseAgent):
 
         company_name = customer.get("company") or deal.get("company_name", "Unknown")
         contact_name = customer.get("name") or deal.get("contact_name", "Unknown")
-        contact_email = customer.get("email") or deal.get("email", "")
+        contact_email = customer.get("email") or deal.get("contact_email", "")
         website = customer.get("website") or deal.get("website", "")
 
         user_message = (
@@ -122,9 +122,12 @@ class ResearchAgent(BaseAgent):
     def _load_prompt(self) -> str:
         """Load the research prompt from disk, falling back to the default."""
         try:
-            return _PROMPT_PATH.read_text(encoding="utf-8")
+            return self._prompt_path.read_text(encoding="utf-8")
         except FileNotFoundError:
-            logger.debug("[research] Prompt file not found at %s, using default", _PROMPT_PATH)
+            logger.debug(
+                "[research] Prompt file not found at %s, using default",
+                self._prompt_path,
+            )
             return _DEFAULT_RESEARCH_PROMPT
 
     @staticmethod
@@ -134,7 +137,9 @@ class ResearchAgent(BaseAgent):
         cleaned = raw.strip()
         if cleaned.startswith("```"):
             lines = cleaned.split("\n")
-            lines = [l for l in lines if not l.strip().startswith("```")]
+            lines = [
+                line for line in lines if not line.strip().startswith("```")
+            ]
             cleaned = "\n".join(lines)
         try:
             return json.loads(cleaned)

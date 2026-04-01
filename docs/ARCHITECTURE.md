@@ -653,7 +653,7 @@ The `deploy/install.sh` script automates the full production setup:
 
 ```bash
 # On a fresh Ubuntu 22.04+ VPS
-curl -fsSL https://raw.githubusercontent.com/adikam/autosales-ai/main/deploy/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Hermes663/Open-CRM-Agent/main/deploy/install.sh | bash
 ```
 
 What the install script does:

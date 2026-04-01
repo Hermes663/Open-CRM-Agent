@@ -1,47 +1,99 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
+import { useState } from "react";
 import {
-  Mail,
-  StickyNote,
-  ArrowRight,
-  Search,
   AlertTriangle,
+  ArrowRight,
   ChevronDown,
   Loader2,
-} from 'lucide-react';
-import { PIPELINE_STAGES } from '@/lib/constants';
-import type { PipelineStage } from '@/lib/types';
+  Mail,
+  Search,
+  StickyNote,
+} from "lucide-react";
+
+import { addActivity, runAgent } from "@/lib/api";
+import { PIPELINE_STAGES } from "@/lib/constants";
+import type { PipelineStage } from "@/lib/types";
 
 interface QuickActionsProps {
   dealId: string;
   currentStage: PipelineStage;
   onStageChange: (stage: PipelineStage) => void;
+  onRefresh?: () => Promise<void>;
 }
 
 export default function QuickActions({
   dealId,
   currentStage,
   onStageChange,
+  onRefresh,
 }: QuickActionsProps) {
   const [stageDropdownOpen, setStageDropdownOpen] = useState(false);
   const [runningResearch, setRunningResearch] = useState(false);
+  const [runningQualifier, setRunningQualifier] = useState(false);
+  const [savingNote, setSavingNote] = useState(false);
+  const [escalating, setEscalating] = useState(false);
 
   async function handleRunResearch() {
     setRunningResearch(true);
     try {
-      await fetch(`/api/deals/${dealId}/activities`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          activity_type: 'research_completed',
-          description: 'Manual research trigger',
-        }),
-      });
-    } catch (err) {
-      console.error('Failed to run research:', err);
+      await runAgent("research", dealId);
+      await onRefresh?.();
+    } catch (error) {
+      console.error("Failed to run research:", error);
     } finally {
-      setTimeout(() => setRunningResearch(false), 2000);
+      setRunningResearch(false);
+    }
+  }
+
+  async function handleSendEmail() {
+    setRunningQualifier(true);
+    try {
+      await runAgent("qualifier", dealId);
+      await onRefresh?.();
+    } catch (error) {
+      console.error("Failed to run qualifier:", error);
+    } finally {
+      setRunningQualifier(false);
+    }
+  }
+
+  async function handleAddNote() {
+    const note = window.prompt("Add a note to this deal:");
+    if (!note?.trim()) {
+      return;
+    }
+
+    setSavingNote(true);
+    try {
+      await addActivity(dealId, {
+        activity_type: "note_added",
+        description: note.trim(),
+        body: note.trim(),
+        created_by: "web",
+      });
+      await onRefresh?.();
+    } catch (error) {
+      console.error("Failed to add note:", error);
+    } finally {
+      setSavingNote(false);
+    }
+  }
+
+  async function handleEscalate() {
+    setEscalating(true);
+    try {
+      await addActivity(dealId, {
+        activity_type: "escalated_to_human",
+        description: "Escalated to human operator",
+        metadata: { escalated_from: currentStage },
+        created_by: "web",
+      });
+      await onRefresh?.();
+    } catch (error) {
+      console.error("Failed to escalate deal:", error);
+    } finally {
+      setEscalating(false);
     }
   }
 
@@ -51,22 +103,35 @@ export default function QuickActions({
         Quick Actions
       </h3>
 
-      {/* Send Email */}
-      <button className="btn-primary w-full justify-center">
-        <Mail className="h-4 w-4" />
-        Send Email
+      <button
+        onClick={handleSendEmail}
+        disabled={runningQualifier}
+        className="btn-primary w-full justify-center"
+      >
+        {runningQualifier ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <Mail className="h-4 w-4" />
+        )}
+        {runningQualifier ? "Sending..." : "Send Qualification Email"}
       </button>
 
-      {/* Add Note */}
-      <button className="btn-secondary w-full justify-center">
-        <StickyNote className="h-4 w-4" />
-        Add Note
+      <button
+        onClick={handleAddNote}
+        disabled={savingNote}
+        className="btn-secondary w-full justify-center"
+      >
+        {savingNote ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <StickyNote className="h-4 w-4" />
+        )}
+        {savingNote ? "Saving..." : "Add Note"}
       </button>
 
-      {/* Change Stage */}
       <div className="relative">
         <button
-          onClick={() => setStageDropdownOpen(!stageDropdownOpen)}
+          onClick={() => setStageDropdownOpen((open) => !open)}
           className="btn-secondary w-full justify-between"
         >
           <span className="flex items-center gap-2">
@@ -99,7 +164,6 @@ export default function QuickActions({
         )}
       </div>
 
-      {/* Run Research */}
       <button
         onClick={handleRunResearch}
         disabled={runningResearch}
@@ -110,13 +174,20 @@ export default function QuickActions({
         ) : (
           <Search className="h-4 w-4" />
         )}
-        {runningResearch ? 'Researching...' : 'Run Research'}
+        {runningResearch ? "Researching..." : "Run Research"}
       </button>
 
-      {/* Escalate */}
-      <button className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-100">
-        <AlertTriangle className="h-4 w-4" />
-        Escalate to Human
+      <button
+        onClick={handleEscalate}
+        disabled={escalating}
+        className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-100 disabled:opacity-60"
+      >
+        {escalating ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <AlertTriangle className="h-4 w-4" />
+        )}
+        {escalating ? "Escalating..." : "Escalate to Human"}
       </button>
     </div>
   );

@@ -3,14 +3,15 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
+from autosales.core.orchestrator import route_deal, should_move_to_lost
+
 if TYPE_CHECKING:
     from autosales.core.agent_runner import AgentRunner
-    from autosales.core.orchestrator import route_deal
     from autosales.integrations.supabase_client import SupabaseClient
 
 logger = logging.getLogger("autosales.heartbeat")
@@ -42,9 +43,7 @@ class HeartbeatDaemon:
         Returns:
             Summary dict with counts of deals processed, actions taken, and errors.
         """
-        from autosales.core.orchestrator import route_deal
-
-        cycle_start = datetime.now(timezone.utc)
+        cycle_start = datetime.now(UTC)
         logger.info("[heartbeat] Cycle started at %s", cycle_start.isoformat())
 
         stats = {"deals_scanned": 0, "actions_taken": 0, "errors": 0}
@@ -70,6 +69,21 @@ class HeartbeatDaemon:
                     pending_followups=pending_followups,
                 )
 
+                if should_move_to_lost(deal, pending_followups):
+                    await self._db.update_deal(
+                        deal_id,
+                        {"stage": "lost", "lost_at": datetime.now(UTC)},
+                    )
+                    await self._db.create_activity(
+                        deal_id=deal_id,
+                        activity_type="deal_lost",
+                        subject="Deal marked as lost after exhausted follow-up cadence",
+                        metadata={"agent_name": "followup"},
+                        created_by="heartbeat",
+                    )
+                    stats["actions_taken"] += 1
+                    continue
+
                 if agent_name is None:
                     logger.debug("[heartbeat] No action for deal %s", deal_id)
                     continue
@@ -87,7 +101,11 @@ class HeartbeatDaemon:
                     deal_id=deal_id,
                     agent_name=agent_name,
                     action_taken=result.action_taken,
-                    metadata=result.metadata,
+                    metadata={
+                        **result.metadata,
+                        "duration_ms": result.metadata.get("elapsed_ms"),
+                        "output_summary": result.activity_log or result.action_taken,
+                    },
                 )
 
                 stats["actions_taken"] += 1
@@ -96,7 +114,7 @@ class HeartbeatDaemon:
                 logger.exception("[heartbeat] Error processing deal %s", deal_id)
                 stats["errors"] += 1
 
-        elapsed = (datetime.now(timezone.utc) - cycle_start).total_seconds()
+        elapsed = (datetime.now(UTC) - cycle_start).total_seconds()
         logger.info(
             "[heartbeat] Cycle complete in %.1fs | scanned=%d actions=%d errors=%d",
             elapsed,

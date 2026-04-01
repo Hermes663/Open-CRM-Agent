@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import httpx
@@ -63,7 +63,7 @@ class OutlookChannel(BaseChannel):
                         item["receivedDateTime"].replace("Z", "+00:00")
                     )
                 except ValueError:
-                    received = datetime.now(timezone.utc)
+                    received = datetime.now(UTC)
 
             from_addr = (
                 item.get("from", {}).get("emailAddress", {}).get("address", "")
@@ -80,7 +80,11 @@ class OutlookChannel(BaseChannel):
                     to_addr=to_addrs[0] if to_addrs else self._user_email,
                     subject=item.get("subject", ""),
                     body=body_obj.get("content", ""),
-                    html_body=body_obj.get("content", "") if body_obj.get("contentType") == "html" else None,
+                    html_body=(
+                        body_obj.get("content", "")
+                        if body_obj.get("contentType") == "html"
+                        else None
+                    ),
                     received_at=received,
                     message_id=item.get("internetMessageId", ""),
                 )
@@ -145,7 +149,7 @@ class OutlookChannel(BaseChannel):
 
     async def _ensure_token(self) -> str:
         """Obtain or refresh the access token using client credentials."""
-        if self._access_token and self._token_expires and datetime.now(timezone.utc) < self._token_expires:
+        if self._access_token and self._token_expires and datetime.now(UTC) < self._token_expires:
             return self._access_token
 
         url = _TOKEN_URL.format(tenant=self._tenant_id)
@@ -164,7 +168,7 @@ class OutlookChannel(BaseChannel):
         self._access_token = token_data["access_token"]
         expires_in = token_data.get("expires_in", 3600)
         from datetime import timedelta
-        self._token_expires = datetime.now(timezone.utc) + timedelta(seconds=expires_in - 60)
+        self._token_expires = datetime.now(UTC) + timedelta(seconds=expires_in - 60)
 
         logger.debug("[outlook] Obtained access token (expires in %ds)", expires_in)
         return self._access_token

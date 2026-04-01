@@ -1,37 +1,44 @@
-'use client';
+"use client";
 
-import {
-  Mail,
-  MailOpen,
-  Search,
-  ArrowRight,
-  Brain,
-  Plus,
-  Clock,
-  Activity as ActivityIcon,
-} from 'lucide-react';
-import { useRealtimeActivities } from '@/hooks/useRealtimeActivities';
-import { formatRelativeTime } from '@/lib/utils';
-import { AGENT_COLORS } from '@/lib/constants';
-import type { ActivityType } from '@/lib/types';
+import type { ElementType } from "react";
+import { Activity, Bot, CircleX, Clock3, Loader2 } from "lucide-react";
 
-const ACTIVITY_CONFIG: Record<
-  ActivityType,
-  { icon: React.ElementType; color: string; bg: string }
+import { useAgentRuns } from "@/hooks/useAgentRuns";
+import { AGENT_COLORS } from "@/lib/constants";
+import { formatRelativeTime } from "@/lib/utils";
+
+const RUN_STATUS_CONFIG: Record<
+  string,
+  { icon: ElementType; color: string; bg: string; label: string }
 > = {
-  email_sent:          { icon: Mail,         color: 'text-blue-600',    bg: 'bg-blue-100' },
-  email_received:      { icon: MailOpen,     color: 'text-emerald-600', bg: 'bg-emerald-100' },
-  research_completed:  { icon: Search,       color: 'text-purple-600',  bg: 'bg-purple-100' },
-  stage_changed:       { icon: ArrowRight,   color: 'text-amber-600',   bg: 'bg-amber-100' },
-  agent_decision:      { icon: Brain,        color: 'text-indigo-600',  bg: 'bg-indigo-100' },
-  deal_created:        { icon: Plus,         color: 'text-slate-600',   bg: 'bg-slate-100' },
-  follow_up_sent:      { icon: Clock,        color: 'text-orange-600',  bg: 'bg-orange-100' },
-  note_added:          { icon: Plus,         color: 'text-slate-500',   bg: 'bg-slate-100' },
-  call_logged:         { icon: ActivityIcon, color: 'text-teal-600',    bg: 'bg-teal-100' },
+  completed: {
+    icon: Bot,
+    color: "text-emerald-600",
+    bg: "bg-emerald-100",
+    label: "Completed",
+  },
+  running: {
+    icon: Clock3,
+    color: "text-blue-600",
+    bg: "bg-blue-100",
+    label: "Running",
+  },
+  failed: {
+    icon: CircleX,
+    color: "text-red-600",
+    bg: "bg-red-100",
+    label: "Failed",
+  },
+  skipped: {
+    icon: Activity,
+    color: "text-slate-600",
+    bg: "bg-slate-100",
+    label: "Skipped",
+  },
 };
 
 export default function AgentActivityFeed() {
-  const { activities, loading } = useRealtimeActivities({ limit: 30 });
+  const { runs, loading } = useAgentRuns(30);
 
   if (loading) {
     return (
@@ -40,7 +47,7 @@ export default function AgentActivityFeed() {
           Agent Activity
         </h3>
         <div className="flex items-center justify-center py-12">
-          <div className="h-6 w-6 animate-spin rounded-full border-2 border-slate-300 border-t-blue-600" />
+          <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
         </div>
       </div>
     );
@@ -52,26 +59,24 @@ export default function AgentActivityFeed() {
         <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500">
           Agent Activity
         </h3>
-        <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
-          Live
+        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
+          Polling
         </span>
       </div>
 
       <div className="max-h-[480px] space-y-1 overflow-y-auto pr-1">
-        {activities.length === 0 ? (
+        {runs.length === 0 ? (
           <p className="py-8 text-center text-sm text-slate-400">
-            No recent activity
+            No recent agent runs
           </p>
         ) : (
-          activities.map((activity) => {
-            const config =
-              ACTIVITY_CONFIG[activity.activity_type as ActivityType] ??
-              ACTIVITY_CONFIG.note_added;
+          runs.map((run) => {
+            const config = RUN_STATUS_CONFIG[run.status] ?? RUN_STATUS_CONFIG.skipped;
             const Icon = config.icon;
 
             return (
               <div
-                key={activity.id}
+                key={run.id}
                 className="flex items-start gap-3 rounded-lg px-2 py-2.5 transition-colors hover:bg-slate-50"
               >
                 <div
@@ -80,24 +85,30 @@ export default function AgentActivityFeed() {
                   <Icon className={`h-4 w-4 ${config.color}`} />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm text-slate-700 leading-snug">
-                    {activity.description}
+                  <p className="text-sm leading-snug text-slate-700">
+                    {run.output_summary ??
+                      run.input_summary ??
+                      `${run.agent_name ?? "agent"} ${config.label.toLowerCase()}`}
                   </p>
                   <div className="mt-1 flex items-center gap-2">
                     <span className="text-xs text-slate-400">
-                      {formatRelativeTime(activity.created_at)}
+                      {formatRelativeTime(run.started_at)}
                     </span>
-                    {activity.agent_name && (
+                    {run.agent_name && (
                       <span
                         className={`badge text-[10px] ${
-                          AGENT_COLORS[activity.agent_name] ??
-                          'bg-slate-100 text-slate-600'
+                          AGENT_COLORS[run.agent_name] ??
+                          "bg-slate-100 text-slate-600"
                         }`}
                       >
-                        {activity.agent_name}
+                        {run.agent_name}
                       </span>
                     )}
+                    <span className="text-xs text-slate-400">{config.label}</span>
                   </div>
+                  {run.error_message && (
+                    <p className="mt-1 text-xs text-red-600">{run.error_message}</p>
+                  )}
                 </div>
               </div>
             );

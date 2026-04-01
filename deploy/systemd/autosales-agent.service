@@ -1,6 +1,6 @@
 [Unit]
 Description=AutoSales AI - Agent Daemon (FastAPI)
-Documentation=https://github.com/adikam/autosales-ai
+Documentation=https://github.com/Hermes663/Open-CRM-Agent
 After=network.target postgresql.service
 Wants=postgresql.service
 

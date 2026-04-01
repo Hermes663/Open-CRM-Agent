@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import asyncio
 import webbrowser
-from typing import Optional
 
 import typer
 
@@ -55,7 +54,7 @@ def list_providers() -> None:
 
 @app.command("models")
 def list_models(
-    provider: Optional[str] = typer.Option(None, "--provider", "-p", help="Filter by provider id"),
+    provider: str | None = typer.Option(None, "--provider", "-p", help="Filter by provider id"),
 ) -> None:
     """List available models across all providers."""
     from autosales.providers.router import ModelRouter
@@ -109,10 +108,7 @@ def auth_status() -> None:
             )
             continue
 
-        if cred.is_expired:
-            status = "EXPIRED"
-        else:
-            status = "OK"
+        status = "EXPIRED" if cred.is_expired else "OK"
 
         identity = cred.email or cred.display_name or "(key)"
         if cred.api_key:
@@ -133,7 +129,12 @@ def auth_status() -> None:
 @auth_app.command("login")
 def auth_login(
     provider: str = typer.Option(..., "--provider", "-p", help="Provider id to authenticate."),
-    api_key: Optional[str] = typer.Option(None, "--api-key", "-k", help="API key (for api_key providers)."),
+    api_key: str | None = typer.Option(
+        None,
+        "--api-key",
+        "-k",
+        help="API key (for api_key providers).",
+    ),
 ) -> None:
     """Authenticate with a provider (API key or OAuth)."""
     from autosales.providers.auth_profiles import AuthProfileStore
@@ -146,7 +147,7 @@ def auth_login(
         prov = registry.get_provider(provider)
     except KeyError as exc:
         typer.echo(f"Error: {exc}")
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from exc
 
     store = AuthProfileStore()
 
@@ -192,7 +193,7 @@ def auth_login(
             typer.echo(f"Authenticated as {identity} via {prov.label}.")
         except Exception as exc:
             typer.echo(f"Token exchange failed: {exc}", err=True)
-            raise typer.Exit(code=1)
+            raise typer.Exit(code=1) from exc
         return
 
     typer.echo(f"Unsupported auth type: {prov.auth_type.value}", err=True)
@@ -205,7 +206,12 @@ def auth_login(
 
 @auth_app.command("logout")
 def auth_logout(
-    provider: str = typer.Option(..., "--provider", "-p", help="Provider id to remove credentials for."),
+    provider: str = typer.Option(
+        ...,
+        "--provider",
+        "-p",
+        help="Provider id to remove credentials for.",
+    ),
 ) -> None:
     """Remove stored credentials for a provider."""
     from autosales.providers.auth_profiles import AuthProfileStore

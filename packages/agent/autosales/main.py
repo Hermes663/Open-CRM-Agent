@@ -12,6 +12,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+from autosales.channels.factory import build_email_channel
 from autosales.core.agent_runner import AgentRunner
 from autosales.core.heartbeat import HeartbeatDaemon
 from autosales.integrations.supabase_client import SupabaseClient
@@ -24,7 +25,7 @@ from autosales.memory.manager import MemoryManager
 load_dotenv()
 
 logging.basicConfig(
-    level=os.environ.get("LOG_LEVEL", "INFO").upper(),
+    level=os.environ.get("AGENT_LOG_LEVEL", os.environ.get("LOG_LEVEL", "INFO")).upper(),
     format="%(asctime)s | %(levelname)-7s | %(name)s | %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
 )
@@ -37,6 +38,8 @@ logger = logging.getLogger("autosales.main")
 db = SupabaseClient()
 memory = MemoryManager(db=db)
 runner = AgentRunner(db=db, memory=memory)
+email_channel = build_email_channel()
+runner.set_channel(email_channel)
 heartbeat = HeartbeatDaemon(
     db=db,
     agent_runner=runner,
@@ -106,6 +109,7 @@ async def health_check() -> dict[str, Any]:
     return {
         "status": "ok",
         "heartbeat_running": heartbeat.is_running,
+        "email_provider_configured": email_channel is not None,
     }
 
 
@@ -132,6 +136,16 @@ async def run_agent(agent_name: str, req: RunAgentRequest) -> dict[str, Any]:
             agent_name=agent_name,
             deal=deal,
             context=req.extra_context,
+        )
+        await db.create_agent_run(
+            deal_id=req.deal_id,
+            agent_name=agent_name,
+            action_taken=result.action_taken,
+            metadata={
+                **result.metadata,
+                "run_type": "manual",
+                "output_summary": result.activity_log or result.action_taken,
+            },
         )
         return {
             "status": "ok",
@@ -175,27 +189,25 @@ async def email_webhook(payload: EmailWebhookPayload) -> dict[str, Any]:
     # Try to find the deal associated with this sender
     # (simplified: search activities by from_addr)
     try:
-        matches = await db.search_activities_ilike(
-            query=payload.from_addr,
-            limit=1,
-        )
-        if not matches:
+        deal = await db.get_deal_by_contact_email(payload.from_addr)
+        if not deal:
             logger.info("[webhook] No matching deal for sender %s", payload.from_addr)
             return {"status": "ok", "action": "no_matching_deal"}
 
-        deal_id = matches[0].get("deal_id", "")
+        deal_id = deal.get("id", "")
         if not deal_id:
             return {"status": "ok", "action": "no_deal_id"}
 
         await db.create_activity(
             deal_id=deal_id,
-            activity_type="inbound_email",
-            direction="inbound",
-            content=f"Subject: {payload.subject}\n\n{payload.body}",
+            activity_type="email_received",
+            subject=payload.subject,
+            body=payload.body,
             metadata={
                 "from": payload.from_addr,
                 "message_id": payload.message_id,
             },
+            created_by="email-webhook",
         )
 
         return {"status": "ok", "action": "activity_created", "deal_id": deal_id}
