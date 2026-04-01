@@ -2,7 +2,7 @@
   "name": "autosales-ai",
   "version": "0.1.0",
   "private": true,
-  "description": "AutoSales AI - Autonomous B2B Sales Development Agent for ADIKAM",
+  "description": "OpenCRM - Production-oriented CRM and autonomous sales agent runtime",
   "author": "ADIKAM Sp. z o.o.",
   "license": "MIT",
   "engines": {
