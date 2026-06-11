@@ -171,6 +171,7 @@ MODEL_ALIASES: dict[str, str] = {
 # Runtime configuration
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class ProviderConfig:
     """Centralised runtime settings loaded from the environment."""
@@ -196,14 +197,10 @@ class ProviderConfig:
 
     # Base URLs for self-hosted / proxied deployments
     openai_base_url: str = field(
-        default_factory=lambda: os.environ.get(
-            "OPENAI_BASE_URL", "https://api.openai.com/v1"
-        )
+        default_factory=lambda: os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1")
     )
     anthropic_base_url: str = field(
-        default_factory=lambda: os.environ.get(
-            "ANTHROPIC_BASE_URL", "https://api.anthropic.com"
-        )
+        default_factory=lambda: os.environ.get("ANTHROPIC_BASE_URL", "https://api.anthropic.com")
     )
 
     # OAuth settings for Codex
@@ -241,9 +238,7 @@ class ProviderConfig:
             self.default_models = {
                 "openai": os.environ.get("OPENAI_MODEL", "gpt-4o"),
                 "openai-codex": os.environ.get("CODEX_MODEL", "gpt-4o"),
-                "anthropic": os.environ.get(
-                    "ANTHROPIC_MODEL", "claude-sonnet-4-20250514"
-                ),
+                "anthropic": os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-20250514"),
             }
 
 

@@ -123,11 +123,7 @@ class GmailChannel(BaseChannel):
 
     async def _ensure_token(self) -> str:
         """Refresh the access token using the stored refresh token."""
-        if (
-            self._access_token
-            and self._token_expires
-            and datetime.now(UTC) < self._token_expires
-        ):
+        if self._access_token and self._token_expires and datetime.now(UTC) < self._token_expires:
             return self._access_token
 
         data = {

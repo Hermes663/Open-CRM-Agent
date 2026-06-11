@@ -141,7 +141,11 @@ class OpenAIProvider(BaseProvider):
 
         logger.info(
             "[openai] %s | %d in + %d out | $%.6f | %dms",
-            model, input_tokens, output_tokens, cost, latency_ms,
+            model,
+            input_tokens,
+            output_tokens,
+            cost,
+            latency_ms,
         )
 
         return LLMResponse(
@@ -183,7 +187,7 @@ class OpenAIProvider(BaseProvider):
             async for line in stream.aiter_lines():
                 if not line.startswith("data: "):
                     continue
-                raw = line[len("data: "):]
+                raw = line[len("data: ") :]
                 if raw.strip() == "[DONE]":
                     break
                 try:

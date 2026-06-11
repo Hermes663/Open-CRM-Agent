@@ -51,6 +51,7 @@ heartbeat = HeartbeatDaemon(
 # App lifecycle
 # ---------------------------------------------------------------------------
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup / shutdown hooks."""
@@ -81,6 +82,7 @@ app.add_middleware(
 # Request / response models
 # ---------------------------------------------------------------------------
 
+
 class RunAgentRequest(BaseModel):
     deal_id: str
     extra_context: dict[str, Any] | None = None
@@ -102,6 +104,7 @@ class EmailWebhookPayload(BaseModel):
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
+
 
 @app.get("/agent/health")
 async def health_check() -> dict[str, Any]:

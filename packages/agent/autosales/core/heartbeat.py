@@ -88,9 +88,7 @@ class HeartbeatDaemon:
                     logger.debug("[heartbeat] No action for deal %s", deal_id)
                     continue
 
-                logger.info(
-                    "[heartbeat] Dispatching agent '%s' for deal %s", agent_name, deal_id
-                )
+                logger.info("[heartbeat] Dispatching agent '%s' for deal %s", agent_name, deal_id)
                 result = await self._agent_runner.run(
                     agent_name=agent_name,
                     deal=deal,
@@ -139,9 +137,7 @@ class HeartbeatDaemon:
         )
         self._scheduler.start()
         self._running = True
-        logger.info(
-            "[heartbeat] Started with interval=%d min", self._interval_minutes
-        )
+        logger.info("[heartbeat] Started with interval=%d min", self._interval_minutes)
 
     def stop(self) -> None:
         """Stop the heartbeat scheduler."""

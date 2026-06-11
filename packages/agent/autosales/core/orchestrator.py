@@ -24,6 +24,7 @@ DAYS_BEFORE_FOLLOWUP = 5
 # Public API
 # ---------------------------------------------------------------------------
 
+
 def route_deal(
     deal: dict[str, Any],
     activities: list[dict[str, Any]],
@@ -90,6 +91,7 @@ def route_deal(
 # ---------------------------------------------------------------------------
 # Helper functions
 # ---------------------------------------------------------------------------
+
 
 def has_research(activities: list[dict[str, Any]]) -> bool:
     """Return True if any activity is a completed research entry."""

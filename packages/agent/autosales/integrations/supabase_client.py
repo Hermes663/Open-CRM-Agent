@@ -243,19 +243,22 @@ class SupabaseClient:
                 updated_at = NOW()
             RETURNING *
         """
-        return await self._fetch_one(
-            sql,
-            (
-                str(uuid4()),
-                deal_id,
-                deal_id,
-                scheduled_at,
-                template_id,
-                status,
-                status,
-                attempt,
-            ),
-        ) or {}
+        return (
+            await self._fetch_one(
+                sql,
+                (
+                    str(uuid4()),
+                    deal_id,
+                    deal_id,
+                    scheduled_at,
+                    template_id,
+                    status,
+                    status,
+                    attempt,
+                ),
+            )
+            or {}
+        )
 
     async def create_agent_run(
         self,
@@ -299,23 +302,26 @@ class SupabaseClient:
             )
             RETURNING *
         """
-        return await self._fetch_one(
-            sql,
-            (
-                str(uuid4()),
-                payload.get("run_type", "heartbeat"),
-                agent_name,
-                deal_id,
-                status,
-                payload.get("input_summary"),
-                payload.get("output_summary") or action_taken,
-                payload.get("tokens_used"),
-                payload.get("cost_usd"),
-                payload.get("duration_ms") or payload.get("elapsed_ms"),
-                payload.get("error_message"),
-                payload.get("started_at"),
-            ),
-        ) or {}
+        return (
+            await self._fetch_one(
+                sql,
+                (
+                    str(uuid4()),
+                    payload.get("run_type", "heartbeat"),
+                    agent_name,
+                    deal_id,
+                    status,
+                    payload.get("input_summary"),
+                    payload.get("output_summary") or action_taken,
+                    payload.get("tokens_used"),
+                    payload.get("cost_usd"),
+                    payload.get("duration_ms") or payload.get("elapsed_ms"),
+                    payload.get("error_message"),
+                    payload.get("started_at"),
+                ),
+            )
+            or {}
+        )
 
     async def get_memories(
         self,
@@ -365,17 +371,20 @@ class SupabaseClient:
             )
             RETURNING *
         """
-        return await self._fetch_one(
-            sql,
-            (
-                str(uuid4()),
-                deal_id,
-                deal_id,
-                content,
-                content_type,
-                Json({}),
-            ),
-        ) or {}
+        return (
+            await self._fetch_one(
+                sql,
+                (
+                    str(uuid4()),
+                    deal_id,
+                    deal_id,
+                    content,
+                    content_type,
+                    Json({}),
+                ),
+            )
+            or {}
+        )
 
     async def search_crm_text(
         self,

@@ -155,9 +155,7 @@ class OpenAICodexProvider(BaseProvider):
         expires_at = time.time() + expires_in
 
         # Decode identity from the JWT access token (or id_token)
-        email, display_name = self._decode_jwt_identity(
-            data.get("id_token", access_token)
-        )
+        email, display_name = self._decode_jwt_identity(data.get("id_token", access_token))
 
         credential = AuthCredential(
             provider_id=self.id,

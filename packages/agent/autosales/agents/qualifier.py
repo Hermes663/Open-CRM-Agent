@@ -68,9 +68,7 @@ class QualifierAgent(BaseAgent):
             )
 
         # Build the LLM prompt with all available context
-        research_memories = [
-            m for m in context.memories if m.get("content_type") == "research"
-        ]
+        research_memories = [m for m in context.memories if m.get("content_type") == "research"]
         conversation_summary = self._summarise_messages(context.messages)
 
         user_message = (
@@ -165,9 +163,7 @@ class QualifierAgent(BaseAgent):
         cleaned = raw.strip()
         if cleaned.startswith("```"):
             lines = cleaned.split("\n")
-            lines = [
-                line for line in lines if not line.strip().startswith("```")
-            ]
+            lines = [line for line in lines if not line.strip().startswith("```")]
             cleaned = "\n".join(lines)
         try:
             return json.loads(cleaned)
