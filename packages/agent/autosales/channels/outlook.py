@@ -65,12 +65,9 @@ class OutlookChannel(BaseChannel):
                 except ValueError:
                     received = datetime.now(UTC)
 
-            from_addr = (
-                item.get("from", {}).get("emailAddress", {}).get("address", "")
-            )
+            from_addr = item.get("from", {}).get("emailAddress", {}).get("address", "")
             to_addrs = [
-                r.get("emailAddress", {}).get("address", "")
-                for r in item.get("toRecipients", [])
+                r.get("emailAddress", {}).get("address", "") for r in item.get("toRecipients", [])
             ]
 
             body_obj = item.get("body", {})
@@ -168,6 +165,7 @@ class OutlookChannel(BaseChannel):
         self._access_token = token_data["access_token"]
         expires_in = token_data.get("expires_in", 3600)
         from datetime import timedelta
+
         self._token_expires = datetime.now(UTC) + timedelta(seconds=expires_in - 60)
 
         logger.debug("[outlook] Obtained access token (expires in %ds)", expires_in)

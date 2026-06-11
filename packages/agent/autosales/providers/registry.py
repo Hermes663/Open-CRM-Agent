@@ -46,9 +46,7 @@ class ProviderRegistry:
             return self._providers[provider_id]
         except KeyError:
             available = ", ".join(sorted(self._providers)) or "(none)"
-            raise KeyError(
-                f"Unknown provider '{provider_id}'. Available: {available}"
-            ) from None
+            raise KeyError(f"Unknown provider '{provider_id}'. Available: {available}") from None
 
     def list_providers(self) -> list[BaseProvider]:
         """Return all registered providers (insertion order)."""
@@ -88,6 +86,7 @@ class ProviderRegistry:
 # ---------------------------------------------------------------------------
 # Auto-register built-in providers
 # ---------------------------------------------------------------------------
+
 
 def _auto_register() -> None:
     """Import and register the three built-in providers."""

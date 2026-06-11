@@ -25,9 +25,11 @@ logger = logging.getLogger("autosales.providers.router")
 # Usage tracker
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class UsageRecord:
     """Accumulated usage for a single session / router instance."""
+
     total_requests: int = 0
     total_input_tokens: int = 0
     total_output_tokens: int = 0
@@ -54,6 +56,7 @@ class UsageRecord:
 # ---------------------------------------------------------------------------
 # Router
 # ---------------------------------------------------------------------------
+
 
 class ModelRouter:
     """Resolve model references and dispatch completions with fallback.
@@ -174,7 +177,9 @@ class ModelRouter:
                 last_error = exc
                 logger.warning(
                     "Provider %s failed for model %s: %s -- trying next",
-                    pid, model_id, exc,
+                    pid,
+                    model_id,
+                    exc,
                 )
                 continue
 
@@ -192,12 +197,14 @@ class ModelRouter:
         models = []
         for provider in self._registry.list_providers():
             for m in provider.get_models():
-                models.append({
-                    "provider_id": m.provider_id,
-                    "model_id": m.id,
-                    "name": m.name,
-                    "context_window": m.context_window,
-                    "cost_input_per_1m": m.cost_input_per_1m,
-                    "cost_output_per_1m": m.cost_output_per_1m,
-                })
+                models.append(
+                    {
+                        "provider_id": m.provider_id,
+                        "model_id": m.id,
+                        "name": m.name,
+                        "context_window": m.context_window,
+                        "cost_input_per_1m": m.cost_input_per_1m,
+                        "cost_output_per_1m": m.cost_output_per_1m,
+                    }
+                )
         return models

@@ -94,9 +94,7 @@ class FollowupAgent(BaseAgent):
             )
 
         # Build LLM prompt
-        system = _FOLLOWUP_SYSTEM_PROMPT.format(
-            attempt=attempt, max_attempts=MAX_FOLLOWUP_ATTEMPTS
-        )
+        system = _FOLLOWUP_SYSTEM_PROMPT.format(attempt=attempt, max_attempts=MAX_FOLLOWUP_ATTEMPTS)
 
         conversation_snippets = "\n".join(
             f"[{m.get('direction', '?')}] {(m.get('body') or '')[:200]}"
@@ -188,9 +186,7 @@ class FollowupAgent(BaseAgent):
         cleaned = raw.strip()
         if cleaned.startswith("```"):
             lines = cleaned.split("\n")
-            lines = [
-                line for line in lines if not line.strip().startswith("```")
-            ]
+            lines = [line for line in lines if not line.strip().startswith("```")]
             cleaned = "\n".join(lines)
         try:
             return json.loads(cleaned)

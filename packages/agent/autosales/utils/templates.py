@@ -107,6 +107,7 @@ class EmailTemplateEngine:
         Returns:
             Rendered string.
         """
+
         def _replacer(match: re.Match) -> str:
             key = match.group(1).strip()
             if key in variables:

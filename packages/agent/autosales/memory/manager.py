@@ -141,9 +141,7 @@ class MemoryManager:
         if self._knowledge_cache is not None:
             return self._knowledge_cache
         try:
-            self._knowledge_cache = (self._config_dir / "KNOWLEDGE.md").read_text(
-                encoding="utf-8"
-            )
+            self._knowledge_cache = (self._config_dir / "KNOWLEDGE.md").read_text(encoding="utf-8")
         except FileNotFoundError:
             logger.debug("[memory] KNOWLEDGE.md not found in %s", self._config_dir)
             self._knowledge_cache = ""

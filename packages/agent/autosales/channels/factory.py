@@ -17,8 +17,7 @@ def build_email_channel() -> BaseChannel | None:
     provider = os.environ.get("EMAIL_PROVIDER", "").strip().lower()
     if not provider:
         logger.warning(
-            "[channels] EMAIL_PROVIDER not configured; "
-            "agent will run without email sending"
+            "[channels] EMAIL_PROVIDER not configured; agent will run without email sending"
         )
         return None
 
@@ -30,8 +29,7 @@ def build_email_channel() -> BaseChannel | None:
         return OutlookChannel()
 
     logger.warning(
-        "[channels] Unsupported EMAIL_PROVIDER=%s; "
-        "agent will run without email sending",
+        "[channels] Unsupported EMAIL_PROVIDER=%s; agent will run without email sending",
         provider,
     )
     return None

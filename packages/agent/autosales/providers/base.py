@@ -16,6 +16,7 @@ from enum import Enum
 # Enums
 # ---------------------------------------------------------------------------
 
+
 class AuthType(Enum):
     """How a provider authenticates requests."""
 
@@ -36,6 +37,7 @@ class FinishReason(Enum):
 # ---------------------------------------------------------------------------
 # Data-transfer objects
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class AuthCredential:
@@ -105,15 +107,15 @@ class AuthCredential:
 class ModelConfig:
     """Static metadata for a single model offered by a provider."""
 
-    id: str                          # e.g. "gpt-4o", "claude-sonnet-4-6"
-    provider_id: str                 # e.g. "openai", "openai-codex", "anthropic"
-    name: str                        # Human-readable display name
+    id: str  # e.g. "gpt-4o", "claude-sonnet-4-6"
+    provider_id: str  # e.g. "openai", "openai-codex", "anthropic"
+    name: str  # Human-readable display name
     context_window: int = 128_000
     max_tokens: int = 4_096
     supports_json: bool = True
     supports_vision: bool = False
     supports_streaming: bool = True
-    cost_input_per_1m: float = 0.0   # USD per 1 M input tokens
+    cost_input_per_1m: float = 0.0  # USD per 1 M input tokens
     cost_output_per_1m: float = 0.0  # USD per 1 M output tokens
 
 
@@ -147,6 +149,7 @@ class LLMResponse:
 # ---------------------------------------------------------------------------
 # Abstract provider
 # ---------------------------------------------------------------------------
+
 
 class BaseProvider(ABC):
     """Contract that every LLM provider plugin must satisfy.

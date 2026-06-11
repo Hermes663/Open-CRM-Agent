@@ -26,6 +26,7 @@ app.add_typer(auth_app, name="auth")
 # providers list
 # ---------------------------------------------------------------------------
 
+
 @app.command("list")
 def list_providers() -> None:
     """List all registered LLM providers."""
@@ -52,6 +53,7 @@ def list_providers() -> None:
 # providers models
 # ---------------------------------------------------------------------------
 
+
 @app.command("models")
 def list_models(
     provider: str | None = typer.Option(None, "--provider", "-p", help="Filter by provider id"),
@@ -69,10 +71,7 @@ def list_models(
         typer.echo("No models found.")
         raise typer.Exit()
 
-    typer.echo(
-        f"\n{'Provider':<18} {'Model':<32} {'Context':<10} "
-        f"{'In $/1M':<10} {'Out $/1M'}"
-    )
+    typer.echo(f"\n{'Provider':<18} {'Model':<32} {'Context':<10} {'In $/1M':<10} {'Out $/1M'}")
     typer.echo("-" * 90)
     for m in models:
         typer.echo(
@@ -86,6 +85,7 @@ def list_models(
 # ---------------------------------------------------------------------------
 # providers auth status
 # ---------------------------------------------------------------------------
+
 
 @auth_app.command("status")
 def auth_status() -> None:
@@ -102,10 +102,7 @@ def auth_status() -> None:
     for provider in registry.list_providers():
         cred = store.get_credential(provider.id)
         if cred is None:
-            typer.echo(
-                f"{provider.id:<18} {provider.auth_type.value:<12} "
-                f"{'NOT SET':<14} -"
-            )
+            typer.echo(f"{provider.id:<18} {provider.auth_type.value:<12} {'NOT SET':<14} -")
             continue
 
         status = "EXPIRED" if cred.is_expired else "OK"
@@ -114,10 +111,7 @@ def auth_status() -> None:
         if cred.api_key:
             identity = f"...{cred.api_key[-6:]}"
 
-        typer.echo(
-            f"{provider.id:<18} {cred.auth_type.value:<12} "
-            f"{status:<14} {identity}"
-        )
+        typer.echo(f"{provider.id:<18} {cred.auth_type.value:<12} {status:<14} {identity}")
 
     typer.echo()
 
@@ -125,6 +119,7 @@ def auth_status() -> None:
 # ---------------------------------------------------------------------------
 # providers auth login
 # ---------------------------------------------------------------------------
+
 
 @auth_app.command("login")
 def auth_login(
@@ -203,6 +198,7 @@ def auth_login(
 # ---------------------------------------------------------------------------
 # providers auth logout
 # ---------------------------------------------------------------------------
+
 
 @auth_app.command("logout")
 def auth_logout(
